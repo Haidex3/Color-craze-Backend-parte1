@@ -58,5 +58,11 @@ public class AuthController {
         return ResponseEntity.ok(response);
     }
 
+    @PostMapping("/guest")
+    public ResponseEntity<AuthResponse> guestLogin() {
+        AuthResponse guestAuth = authService.createGuestToken();
+        return ResponseEntity.ok(guestAuth);
+    }
+
 
 }

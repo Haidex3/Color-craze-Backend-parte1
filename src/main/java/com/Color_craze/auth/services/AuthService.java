@@ -1,5 +1,6 @@
 package com.Color_craze.auth.services;
 
+import java.util.UUID;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -96,4 +97,35 @@ public class AuthService {
 
         return new AuthResponse(newAccessToken, newRefreshToken, userData);
     }
+
+    
+    public UserDetailsResponse createTemporaryUser() {
+            String id = UUID.randomUUID().toString(); 
+            String email = "guest_" + id + "@example.com";
+            String nickname = "Guest_" + id.substring(0, 8);
+            return new UserDetailsResponse(id, email, nickname);
+        }
+
+        public AuthResponse createGuestToken() {
+        String id = UUID.randomUUID().toString();
+        String email = "guest_" + id + "@example.com";
+        String nickname = "Guest_" + id.substring(0, 8);
+
+        AuthUser guestAuthUser = AuthUser.builder()
+                .id(id)
+                .email(email)
+                .nickname(nickname)
+                .password("")
+                .build();
+
+        CustomUserDetails tempUserDetails = new CustomUserDetails(guestAuthUser);
+
+        String token = jwtService.generateToken(tempUserDetails);
+        String refreshToken = jwtService.generateRefreshToken(tempUserDetails);
+
+        UserDetailsResponse guestUser = new UserDetailsResponse(id, email, nickname);
+
+        return new AuthResponse(token, refreshToken, guestUser);
+    }
+
 }

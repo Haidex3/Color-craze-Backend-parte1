@@ -28,7 +28,6 @@ public class CustomUserDetails implements UserDetails {
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
-        // Por ahora no hay roles/authorities configurados
         return Collections.emptyList();
     }
 
@@ -44,21 +43,21 @@ public class CustomUserDetails implements UserDetails {
 
     @Override
     public boolean isAccountNonExpired() {
-        return true; // Puedes implementar lógica personalizada si lo necesitas
+        return true;
     }
 
     @Override
     public boolean isAccountNonLocked() {
-        return true; // Cambia si manejas bloqueo de cuentas
+        return true;
     }
 
     @Override
     public boolean isCredentialsNonExpired() {
-        return true; // Cambia si manejas expiración de credenciales
+        return true;
     }
 
     @Override
     public boolean isEnabled() {
-        return true; // Cambia si manejas usuarios inactivos
+        return true;
     }
 }
