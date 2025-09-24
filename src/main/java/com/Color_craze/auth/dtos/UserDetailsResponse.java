@@ -1,9 +1,11 @@
 package com.Color_craze.auth.dtos;
 
-import java.util.UUID;
-
+/**
+ * Respuesta con los datos del usuario autenticado.
+ * En MongoDB, el id se maneja como String.
+ */
 public record UserDetailsResponse(
-        UUID id,
+        String id,
         String email,
-        String name) {
+        String nickname) {
 }

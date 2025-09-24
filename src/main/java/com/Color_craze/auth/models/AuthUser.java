@@ -1,31 +1,23 @@
 package com.Color_craze.auth.models;
 
-
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.mapping.Document;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-@Entity
 @Data
-@Table(name = "auths")
-@NoArgsConstructor(access = lombok.AccessLevel.PROTECTED)
-@AllArgsConstructor
 @Builder
+@NoArgsConstructor
+@AllArgsConstructor
+@Document(collection = "auths")
 public class AuthUser {
 
     @Id
     private String id;
 
-    @Column(name = "email", nullable = false, unique = true)
     private String email;
-    @Column(name = "password", nullable = false, unique = true)
     private String password;
-    @Column(name = "name", nullable = false)
-    private String name;
-
+    private String nickname;
 }

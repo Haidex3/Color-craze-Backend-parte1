@@ -1,7 +1,5 @@
 package com.Color_craze.auth.services;
 
-import java.util.UUID;
-
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -21,7 +19,7 @@ import lombok.RequiredArgsConstructor;
 
 /**
  * Service for handling authentication operations such as login and token refresh.
- * Handles user verification, JWT generation, and assembling authentication responses.
+ * Uses MongoDB for user persistence.
  */
 @Service
 @RequiredArgsConstructor
@@ -32,56 +30,43 @@ public class AuthService {
     private final AuthenticationManager authenticationManager;
 
     /**
-     * Authenticates a user with email and password, generates access and refresh tokens,
-     * and returns an authentication response containing tokens and user details.
-     *
-     * @param request The login request containing email and password.
-     * @return AuthResponse containing access token, refresh token, and user details.
-     * @throws BadCredentialsException if authentication fails or user is not found.
+     * Authenticates a user with email and password, generates tokens,
+     * and returns an authentication response.
      */
     public AuthResponse login(LoginRequest request) {
-
-        // 🔍 Depuración: imprime lo que llega desde el front
-        System.out.println("[DEBUG] Email recibido: " + request.email());
-        System.out.println("[DEBUG] Password recibido (texto plano): " + request.password());
-
-        // 🔍 Genera un hash temporal para ver cómo quedaría encriptado
-        String tempHash = new org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder().encode(request.password());
-        System.out.println("[DEBUG] Hash BCrypt temporal: " + tempHash);
+        System.out.println("[DEBUG] Consultando en colección 'auths' el email: " + request.email());
+        var userOpt = authRepository.findByEmail(request.email());
+        System.out.println("[DEBUG] Resultado de la consulta: " + userOpt);
 
         try {
             authenticationManager.authenticate(
-                    new UsernamePasswordAuthenticationToken(
-                            request.email(),
-                            request.password()));
+                new UsernamePasswordAuthenticationToken(
+                    request.email(),
+                    request.password()
+                )
+            );
         } catch (Exception ex) {
             throw new BadCredentialsException("Credenciales inválidas");
         }
 
-        AuthUser user = authRepository.findByEmail(request.email())
-                .orElseThrow(() -> new BadCredentialsException("Usuario no encontrado"));
+        AuthUser user = userOpt
+            .orElseThrow(() -> new BadCredentialsException("Usuario no encontrado"));
 
         CustomUserDetails userDetails = new CustomUserDetails(user);
 
         String token = jwtService.generateToken(userDetails);
         String refreshToken = jwtService.generateRefreshToken(userDetails);
 
+        // Usa el id como String, porque Mongo usa ObjectId/string, no UUID por defecto
         UserDetailsResponse userData = new UserDetailsResponse(
-                UUID.fromString(user.getId()), user.getEmail(), user.getName());
+            user.getId(), user.getEmail(), user.getNickname()
+        );
 
         return new AuthResponse(token, refreshToken, userData);
     }
 
     /**
      * Refreshes the access token using a valid refresh token.
-     * Verifies the refresh token, generates new access and refresh tokens,
-     * and returns an updated authentication response.
-     *
-     * @param refreshToken The refresh token.
-     * @return AuthResponse containing new access token, new refresh token, and user details.
-     * @throws ExpiredJwtException if the refresh token has expired.
-     * @throws SignatureException if the refresh token is invalid.
-     * @throws BadCredentialsException if the user associated with the token is not found.
      */
     public AuthResponse refreshToken(String refreshToken) {
         String email;
@@ -94,7 +79,7 @@ public class AuthService {
         }
 
         AuthUser user = authRepository.findByEmail(email)
-                .orElseThrow(() -> new BadCredentialsException("Usuario no encontrado"));
+            .orElseThrow(() -> new BadCredentialsException("Usuario no encontrado"));
 
         CustomUserDetails userDetails = new CustomUserDetails(user);
 
@@ -106,9 +91,9 @@ public class AuthService {
         String newRefreshToken = jwtService.generateRefreshToken(userDetails);
 
         UserDetailsResponse userData = new UserDetailsResponse(
-                UUID.fromString(user.getId()), user.getEmail(), user.getName());
+            user.getId(), user.getEmail(), user.getNickname()
+        );
 
         return new AuthResponse(newAccessToken, newRefreshToken, userData);
     }
-
 }
