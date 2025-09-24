@@ -24,19 +24,18 @@ public class SecurityConfig {
         this.userDetailsService = userDetailsService;
     }
 
-    /** Configura solo autenticación básica para proteger las rutas */
     @Bean
     SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
-            .csrf(AbstractHttpConfigurer::disable) // Deshabilita CSRF para simplificar
+            .csrf(AbstractHttpConfigurer::disable)
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/api/auth/**").permitAll() // Público
-                .anyRequest().authenticated()) // Todo lo demás requiere login
-            .httpBasic(); // Autenticación básica
+                .requestMatchers("/api/auth/**").permitAll()
+                .anyRequest().authenticated())
+            .httpBasic(httpBasic -> {});
         return http.build();
     }
 
-    /** Proveedor de autenticación usando tu UserDetailsService y BCrypt */
+    @SuppressWarnings("deprecation")
     @Bean
     AuthenticationProvider authenticationProvider() {
         DaoAuthenticationProvider authProvider = new DaoAuthenticationProvider();
@@ -45,13 +44,12 @@ public class SecurityConfig {
         return authProvider;
     }
 
-    /** Codificador de contraseñas */
+
     @Bean
     PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
     }
 
-    /** Expone el AuthenticationManager para inyección en servicios */
     @Bean
     AuthenticationManager authenticationManager(AuthenticationConfiguration config) throws Exception {
         return config.getAuthenticationManager();

@@ -32,9 +32,19 @@ public class AuthController {
      */
     private final AuthService authService;
     @PostMapping("/login")
-    public ResponseEntity<AuthResponse> login(@RequestBody LoginRequest request) {
-        return ResponseEntity.ok(authService.login(request));
+    public ResponseEntity<?> login(@RequestBody LoginRequest request) {
+        System.out.println("Entró al método login con " + request);
+        try {
+            var result = authService.login(request);
+            System.out.println("Antes de retornar " + result);
+            return ResponseEntity.ok(result);
+        } catch (Exception e) {
+            System.out.println("Error en login: " + e.getMessage());
+            e.printStackTrace();
+            throw e;
+        }
     }
+
 
     /**
      * Refreshes a JWT token using a valid refresh token.

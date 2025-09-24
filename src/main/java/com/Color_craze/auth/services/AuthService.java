@@ -40,6 +40,15 @@ public class AuthService {
      * @throws BadCredentialsException if authentication fails or user is not found.
      */
     public AuthResponse login(LoginRequest request) {
+
+        // 🔍 Depuración: imprime lo que llega desde el front
+        System.out.println("[DEBUG] Email recibido: " + request.email());
+        System.out.println("[DEBUG] Password recibido (texto plano): " + request.password());
+
+        // 🔍 Genera un hash temporal para ver cómo quedaría encriptado
+        String tempHash = new org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder().encode(request.password());
+        System.out.println("[DEBUG] Hash BCrypt temporal: " + tempHash);
+
         try {
             authenticationManager.authenticate(
                     new UsernamePasswordAuthenticationToken(
