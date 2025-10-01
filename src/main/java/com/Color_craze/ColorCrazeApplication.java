@@ -9,5 +9,4 @@ public class ColorCrazeApplication {
 	public static void main(String[] args) {
 		SpringApplication.run(ColorCrazeApplication.class, args);
 	}
-
 }
