@@ -1,5 +1,7 @@
 package com.Color_craze.board.models;
 
+import java.util.UUID;
+
 import com.Color_craze.utils.enums.ColorStatus;
 
 import lombok.Getter;
@@ -8,11 +10,11 @@ import lombok.Setter;
 @Getter
 @Setter
 public class Player extends Box{
-    private String id;
+    private UUID id;
     private int col, Row;
     private int score;
 
-    public Player(String id, ColorStatus color) {
+    public Player(UUID id, ColorStatus color) {
         super(color);
         this.color = color;
         this.id = id;

@@ -1,122 +1,96 @@
 package com.Color_craze.board.models;
 
-import java.util.HashSet;
-import java.util.Set;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 
+import com.Color_craze.board.dtos.Responses.MoveResult;
+import com.Color_craze.board.dtos.Responses.PlatformUpdate;
 import com.Color_craze.utils.enums.ColorStatus;
 import com.Color_craze.utils.enums.PlayerMove;
 
 public class Board {
 
-    private Box[][] grid;
-    private Player[] players;
+    private static final int ROWS = 15;
+    private static final int COLS = 31;
 
-    public static final int ROWS = 15;
-    public static final int COLS = 31;
+    private final Box[][] grid;
+    private final Map<UUID, Player> players;
 
-    public Board(Player[] players) {
-        grid = new Box[ROWS][COLS];
-        for (int i = 0; i < ROWS; i++) {
-            for (int j = 0; j < COLS; j++) {
-                grid[i][j] = new Box(ColorStatus.WHITE);
+    public Board() {
+        this.grid = new Box[ROWS][COLS];
+        this.players = new HashMap<>();
+        initBoard();
+    }
+
+    private void initBoard() {
+        for (int r = 0; r < ROWS; r++) {
+            for (int c = 0; c < COLS; c++) {
+                grid[r][c] = new Box(ColorStatus.WHITE);
             }
         }
+    }
 
-        Set<Position> platforms = generatePlatforms(ROWS, COLS);
-        for (Position pos : platforms) {
-            grid[pos.row()][pos.col()] = new Platform(ColorStatus.WHITE);
-        }
+    public void addPlayer(Player player) {
+        players.put(player.getId(), player);
+        grid[player.getRow()][player.getCol()] = player;
+    }
 
-        this.players = players;
-
-        for (Player player : players) {
-            int row = player.getRow();
-            int col = player.getCol();
-
-            if (row < 0 || row >= ROWS || col < 0 || col >= COLS) {
-                throw new IllegalArgumentException(
-                    "Jugador fuera de los límites del tablero: (" + row + "," + col + ")"
-                );
-            }
-
-            grid[row][col] = player;
+    public void removePlayer(UUID playerId) {
+        Player player = players.remove(playerId);
+        if (player != null) {
+            grid[player.getRow()][player.getCol()] = new Box(ColorStatus.WHITE);
         }
     }
 
-
-    public Box getBlock(int row, int col) {
-        return grid[row][col];
-    }
-
-    public void setBlock(int row, int col, Box block) {
-        grid[row][col] = block;
-    }
-
-    private Set<Position> generatePlatforms(int rows, int cols) {
-        Set<Position> platforms = new HashSet<>();
-
-        platforms.add(new Position(9, 1));
-        platforms.add(new Position(9, 29));
-        platforms.add(new Position(10, 15));
-        platforms.add(new Position(11, 16));
-        platforms.add(new Position(11, 14));
-        platforms.add(new Position(12, 13));
-        platforms.add(new Position(12, 17));
-
-        for (int i = 0; i < cols; i++) {
-            platforms.add(new Position(0, i));
-            platforms.add(new Position(rows - 1, i));
-
-            if (i >= 8 && i <= 22) platforms.add(new Position(3, i));
-            if ((i >= 3 && i < 6) || (i > 24 && i <= 27)) platforms.add(new Position(6, i));
-            if ((i >= 6 && i <= 9) || (i >= 21 && i <= 24)) platforms.add(new Position(7, i));
-            if ((i >= 4 && i <= 8) || (i >= 22 && i <= 26)) platforms.add(new Position(11, i));
+    public MoveResult movePlayer(UUID playerId, PlayerMove playerMove) {
+        Player player = players.get(playerId);
+        if (player == null) {
+            throw new IllegalArgumentException("Player not found: " + playerId);
         }
 
-        for (int i = 0; i < rows; i++) {
-            if (i != 9) {
-                platforms.add(new Position(i, 0));
-                platforms.add(new Position(i, cols - 1));
-            }
-        }
-
-        return platforms;
-    }
-
-    public Board movePlayer(Player player, PlayerMove playerMove) {
         int currentRow = player.getRow();
         int currentCol = player.getCol();
         int newRow = currentRow;
         int newCol = currentCol;
+
         switch (playerMove) {
             case RIGHT -> newCol++;
             case LEFT  -> newCol--;
             case UP    -> newRow--;
             case DOWN  -> newRow++;
         }
+
         if (newRow < 0 || newRow >= ROWS || newCol < 0 || newCol >= COLS) {
-            return this;
+            return new MoveResult(currentRow, currentCol, currentRow, currentCol, List.of());
         }
+
         Box destination = grid[newRow][newCol];
         if (destination instanceof Platform) {
-            return this; 
+            return new MoveResult(currentRow, currentCol, currentRow, currentCol, List.of());
         }
+
         grid[currentRow][currentCol] = new Box(ColorStatus.WHITE);
         player.setRow(newRow);
         player.setCol(newCol);
         grid[newRow][newCol] = player;
-        updateAdjacentPlatforms(newRow, newCol, player.getColor());
 
-        return this;
+        List<PlatformUpdate> updatedPlatforms = updateAdjacentPlatforms(newRow, newCol, player.getColor());
+
+        return new MoveResult(currentRow, currentCol, newRow, newCol, updatedPlatforms);
     }
 
-    private void updateAdjacentPlatforms(int row, int col, ColorStatus playerColor) {
+    private List<PlatformUpdate> updateAdjacentPlatforms(int row, int col, ColorStatus playerColor) {
         int[][] directions = {
             {-1, 0},
             {1, 0},
             {0, -1},
             {0, 1}
         };
+
+        List<PlatformUpdate> updates = new ArrayList<>();
 
         for (int[] dir : directions) {
             int r = row + dir[0];
@@ -126,13 +100,19 @@ public class Board {
                 Box box = grid[r][c];
                 if (box instanceof Platform platform) {
                     platform.setColor(playerColor);
+                    updates.add(new PlatformUpdate(r, c, playerColor));
                 }
             }
         }
+
+        return updates;
     }
 
+    public Box[][] getGrid() {
+        return grid;
+    }
 
-
-    private record Position(int row, int col) {}
-
+    public Map<UUID, Player> getPlayers() {
+        return players;
+    }
 }
