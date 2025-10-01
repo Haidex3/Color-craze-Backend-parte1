@@ -1,0 +1,31 @@
+package com.Color_craze.board.models;
+
+import com.Color_craze.utils.enums.ColorStatus;
+
+import lombok.Getter;
+import lombok.Setter;
+
+@Getter
+@Setter
+public class Player extends Box{
+    private String id;
+    private int col, Row;
+    private int score;
+
+    public Player(String id, ColorStatus color) {
+        super(color);
+        this.color = color;
+        this.id = id;
+        switch (color) {
+        case PINK -> {Row = 14;
+            col = 30;}
+        case YELLOW -> {Row = 14;
+            col = 1;}
+        case PURPLE -> {Row = 4;
+            col = 10;}
+        case GREEN -> {Row = 4;
+            col = 22;}
+        default -> {Row = -1;
+            col = -1;}
+    }}
+}
