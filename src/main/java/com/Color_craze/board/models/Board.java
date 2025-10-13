@@ -8,6 +8,7 @@ import java.util.UUID;
 
 import com.Color_craze.board.dtos.Responses.MoveResult;
 import com.Color_craze.board.dtos.Responses.PlatformUpdate;
+import com.Color_craze.board.dtos.Responses.PlayerUpdate;
 import com.Color_craze.utils.enums.ColorStatus;
 import com.Color_craze.utils.enums.PlayerMove;
 
@@ -67,12 +68,12 @@ public class Board {
         }
 
         if (newRow < 0 || newRow >= ROWS || newCol < 0 || newCol >= COLS) {
-            return new MoveResult(currentRow, currentCol, currentRow, currentCol, List.of(), false);
+            return new MoveResult(currentRow, currentCol, List.of(), List.of(), false);
         }
 
         Box destination = grid[newRow][newCol];
         if (destination instanceof Platform || destination instanceof Player) {
-            return new MoveResult(currentRow, currentCol, currentRow, currentCol, List.of(), false);
+            return new MoveResult(currentRow, currentCol, List.of(), List.of(), false);
         }
 
         synchronized (getGridLock(playerId)) {
@@ -81,7 +82,7 @@ public class Board {
                     getGridLock(playerId).wait();
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
-                    return new MoveResult(currentRow, currentCol, currentRow, currentCol, List.of(), false);
+                    return new MoveResult(currentRow, currentCol, List.of(), List.of(), false);
                 }
             }
 
@@ -91,8 +92,9 @@ public class Board {
                 player.setCol(newCol);
                 grid[newRow][newCol] = player;
 
-                List<PlatformUpdate> updatedPlatforms = updateAdjacentPlatforms(newRow, newCol, player.getColor());
-                return new MoveResult(currentRow, currentCol, newRow, newCol, updatedPlatforms, true);
+                List<PlayerUpdate> affectedPlayers = new ArrayList<>();
+                List<PlatformUpdate> updatedPlatforms = updateAdjacentPlatforms(newRow, newCol, player.getColor(), affectedPlayers);
+                return new MoveResult(newRow, newCol, updatedPlatforms, affectedPlayers, true);
             } finally {
                 releaseLock(playerId);
                 getGridLock(playerId).notifyAll();
@@ -101,12 +103,9 @@ public class Board {
     }
 
 
-    private List<PlatformUpdate> updateAdjacentPlatforms(int row, int col, ColorStatus playerColor) {
+    private List<PlatformUpdate> updateAdjacentPlatforms(int row, int col, ColorStatus playerColor, List<PlayerUpdate> affectedPlayers) {
         int[][] directions = {
-            {-1, 0},
-            {1, 0},
-            {0, -1},
-            {0, 1}
+            {-1, 0}, {1, 0}, {0, -1}, {0, 1}
         };
 
         List<PlatformUpdate> updates = new ArrayList<>();
@@ -118,7 +117,7 @@ public class Board {
             if (r >= 0 && r < ROWS && c >= 0 && c < COLS) {
                 Box box = grid[r][c];
                 if (box instanceof Platform platform) {
-                    platform.setColor(playerColor);
+                    updatePlatformAndScores(platform, playerColor, affectedPlayers);
                     updates.add(new PlatformUpdate(r, c, playerColor));
                 }
             }
@@ -126,6 +125,40 @@ public class Board {
 
         return updates;
     }
+
+
+    private void updatePlatformAndScores(Platform platform, ColorStatus newColor, List<PlayerUpdate> affectedPlayers) {
+        ColorStatus previousColor = platform.getColor();
+
+        if (previousColor == newColor) {
+            return;
+        }
+
+        Player paintingPlayer = findPlayerByColor(newColor);
+        if (paintingPlayer != null) {
+            paintingPlayer.setScore(paintingPlayer.getScore() + 1);
+            affectedPlayers.add(new PlayerUpdate(paintingPlayer.getId(), paintingPlayer.getColor(), paintingPlayer.getScore()));
+        }
+
+        if (previousColor != ColorStatus.WHITE && previousColor != newColor) {
+            Player previousPlayer = findPlayerByColor(previousColor);
+            if (previousPlayer != null && previousPlayer.getScore() > 0) {
+                previousPlayer.setScore(previousPlayer.getScore() - 1);
+                affectedPlayers.add(new PlayerUpdate(previousPlayer.getId(), previousPlayer.getColor(), previousPlayer.getScore()));
+            }
+        }
+
+        platform.setColor(newColor);
+    }
+
+
+    private Player findPlayerByColor(ColorStatus color) {
+        return players.values().stream()
+                .filter(p -> p.getColor() == color)
+                .findFirst()
+                .orElse(null);
+    }
+
 
     public Box[][] getGrid() {
         return grid;
