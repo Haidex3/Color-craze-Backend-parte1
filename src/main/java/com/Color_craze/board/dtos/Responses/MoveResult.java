@@ -7,5 +7,6 @@ public record MoveResult(
     int oldCol,
     int newRow,
     int newCol,
-    List<PlatformUpdate> platforms
+    List<PlatformUpdate> platforms,
+    boolean success
 ) {}

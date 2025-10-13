@@ -19,6 +19,9 @@ public class Board {
     private final Box[][] grid;
     private final Map<UUID, Player> players;
 
+    private final Object gridLock = new Object();
+    private final List<UUID> lockQueue = new ArrayList<>();
+
     public Board() {
         this.grid = new Box[ROWS][COLS];
         this.players = new HashMap<>();
@@ -64,23 +67,39 @@ public class Board {
         }
 
         if (newRow < 0 || newRow >= ROWS || newCol < 0 || newCol >= COLS) {
-            return new MoveResult(currentRow, currentCol, currentRow, currentCol, List.of());
+            return new MoveResult(currentRow, currentCol, currentRow, currentCol, List.of(), false);
         }
 
         Box destination = grid[newRow][newCol];
-        if (destination instanceof Platform) {
-            return new MoveResult(currentRow, currentCol, currentRow, currentCol, List.of());
+        if (destination instanceof Platform || destination instanceof Player) {
+            return new MoveResult(currentRow, currentCol, currentRow, currentCol, List.of(), false);
         }
 
-        grid[currentRow][currentCol] = new Box(ColorStatus.WHITE);
-        player.setRow(newRow);
-        player.setCol(newCol);
-        grid[newRow][newCol] = player;
+        synchronized (getGridLock(playerId)) {
+            while (!canAcquireLock(playerId)) {
+                try {
+                    getGridLock(playerId).wait();
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    return new MoveResult(currentRow, currentCol, currentRow, currentCol, List.of(), false);
+                }
+            }
 
-        List<PlatformUpdate> updatedPlatforms = updateAdjacentPlatforms(newRow, newCol, player.getColor());
+            try {
+                grid[currentRow][currentCol] = new Box(ColorStatus.WHITE);
+                player.setRow(newRow);
+                player.setCol(newCol);
+                grid[newRow][newCol] = player;
 
-        return new MoveResult(currentRow, currentCol, newRow, newCol, updatedPlatforms);
+                List<PlatformUpdate> updatedPlatforms = updateAdjacentPlatforms(newRow, newCol, player.getColor());
+                return new MoveResult(currentRow, currentCol, newRow, newCol, updatedPlatforms, true);
+            } finally {
+                releaseLock(playerId);
+                getGridLock(playerId).notifyAll();
+            }
+        }
     }
+
 
     private List<PlatformUpdate> updateAdjacentPlatforms(int row, int col, ColorStatus playerColor) {
         int[][] directions = {
@@ -115,4 +134,29 @@ public class Board {
     public Map<UUID, Player> getPlayers() {
         return players;
     }
+
+    //Herramientas para el bloqueo 
+
+    private Object getGridLock(UUID playerId) {
+        synchronized (gridLock) {
+            if (!lockQueue.contains(playerId)) {
+                lockQueue.add(playerId);
+                lockQueue.sort(UUID::compareTo);
+            }
+            return gridLock;
+        }
+    }
+
+    private boolean canAcquireLock(UUID playerId) {
+        synchronized (gridLock) {
+            return !lockQueue.isEmpty() && lockQueue.get(0).equals(playerId);
+        }
+    }
+
+    private void releaseLock(UUID playerId) {
+        synchronized (gridLock) {
+            lockQueue.remove(playerId);
+        }
+    }
+
 }
