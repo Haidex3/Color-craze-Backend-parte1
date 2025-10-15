@@ -30,27 +30,26 @@ public class SecurityConfig {
         http
             .csrf(AbstractHttpConfigurer::disable)
             .authorizeHttpRequests(auth -> auth
-                // Endpoints públicos
                 .requestMatchers("/api/auth/**", "/swagger-ui/**", "/v3/api-docs/**").permitAll()
-                // Resto requiere autenticación
                 .anyRequest().authenticated())
             .authenticationProvider(authenticationProvider())
             .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
-            .httpBasic(httpBasic -> {}); // Opcional: HTTP Basic para pruebas
+            .httpBasic(httpBasic -> {});
         return http.build();
     }
 
     @Bean
+    @SuppressWarnings("deprecation")
     AuthenticationProvider authenticationProvider() {
         DaoAuthenticationProvider authProvider = new DaoAuthenticationProvider();
-        authProvider.setUserDetailsService(userDetailsService); // Mongo UserDetailsService
+        authProvider.setUserDetailsService(userDetailsService);
         authProvider.setPasswordEncoder(passwordEncoder());
         return authProvider;
     }
 
     @Bean
     PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder(); // Asegúrate de usar BCrypt al guardar usuarios en Mongo
+        return new BCryptPasswordEncoder();
     }
 
     @Bean

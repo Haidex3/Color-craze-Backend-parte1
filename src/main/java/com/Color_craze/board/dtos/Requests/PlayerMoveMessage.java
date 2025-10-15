@@ -7,4 +7,5 @@ import lombok.Data;
 public class PlayerMoveMessage {
     private String playerId;
     private PlayerMove direction;
+    private String room;
 }

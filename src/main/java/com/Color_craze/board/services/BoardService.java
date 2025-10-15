@@ -1,6 +1,8 @@
 package com.Color_craze.board.services;
 
+import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 import org.springframework.stereotype.Service;
 
@@ -14,32 +16,50 @@ import com.Color_craze.board.models.Board;
 @Service
 public class BoardService {
 
-    private final Board board;
+    private final Map<String, Board> boards = new ConcurrentHashMap<>();
 
-    public BoardService() {
-        this.board = new Board();
+    private Board getOrCreateBoard(String gameId) {
+        return boards.computeIfAbsent(gameId, id -> {
+            Board newBoard = new Board();
 
-        Player p1 = new Player(UUID.randomUUID(),ColorStatus.PINK);
-        Player p2 = new Player(UUID.randomUUID(),ColorStatus.YELLOW);
+            Player p1 = new Player(UUID.randomUUID(), ColorStatus.PINK);
+            Player p2 = new Player(UUID.randomUUID(), ColorStatus.YELLOW);
 
-        board.addPlayer(p1);
-        board.addPlayer(p2);
+            newBoard.addPlayer(p1);
+            newBoard.addPlayer(p2);
+
+            return newBoard;
+        });
     }
 
-    public Board getBoard() {
-        return board;
+    public Board getBoard(String gameId) {
+        return getOrCreateBoard(gameId);
     }
 
-    public Box getBlock(int row, int col) {
-        return board.getGrid()[row][col];
+    public Box getBlock(String gameId, int row, int col) {
+        return getOrCreateBoard(gameId).getGrid()[row][col];
     }
 
-    public void setBlock(int row, int col, Box block) {
-        board.getGrid()[row][col] = block;
+    public void setBlock(String gameId, int row, int col, Box block) {
+        getOrCreateBoard(gameId).getGrid()[row][col] = block;
     }
 
-    public MoveResult movePlayer(String playerId, PlayerMove playerMove) {
+    public MoveResult movePlayer(String gameId, String playerId, PlayerMove playerMove) {
+        Board board = getOrCreateBoard(gameId);
         UUID uuid = UUID.fromString(playerId);
         return board.movePlayer(uuid, playerMove);
+    }
+
+    public String createNewBoard() {
+        String gameId = UUID.randomUUID().toString();
+        boards.put(gameId, new Board());
+        return gameId;
+    }
+
+    public Player addPlayerToBoard(String gameId, ColorStatus color) {
+        Board board = getOrCreateBoard(gameId);
+        Player newPlayer = new Player(UUID.randomUUID(), color);
+        board.addPlayer(newPlayer);
+        return newPlayer;
     }
 }
