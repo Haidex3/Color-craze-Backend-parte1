@@ -1,6 +1,9 @@
 package com.Color_craze.board.controllers;
 
 
+import java.util.List;
+import java.util.concurrent.CompletableFuture;
+
 import org.springframework.messaging.handler.annotation.DestinationVariable;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.handler.annotation.Payload;
@@ -21,8 +24,21 @@ public class GameSocketController {
     private final SimpMessagingTemplate messagingTemplate;
 
     @MessageMapping("/move.{gameId}")
-    public void handlePlayerMove( @DestinationVariable String gameId, @Payload PlayerMoveMessage moveMessage) {
-        MoveResult result = boardService.movePlayer(gameId, moveMessage.getPlayerId(), moveMessage.getDirection());
-        messagingTemplate.convertAndSend("/topic/board." + gameId, result);
+    public void handlePlayerMove(@DestinationVariable String gameId, @Payload PlayerMoveMessage moveMessage) {
+        List<MoveResult> results = boardService.movePlayer(gameId, moveMessage.getPlayerId(), moveMessage.getDirection());
+
+        CompletableFuture.runAsync(() -> {
+            for (MoveResult result : results) {
+                messagingTemplate.convertAndSend("/topic/board." + gameId, result);
+                try {
+                    Thread.sleep(80);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    break;
+                }
+            }
+        });
     }
+
+
 }

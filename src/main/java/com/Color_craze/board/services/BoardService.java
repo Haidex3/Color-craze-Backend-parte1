@@ -1,5 +1,7 @@
 package com.Color_craze.board.services;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -44,10 +46,29 @@ public class BoardService {
         getOrCreateBoard(gameId).getGrid()[row][col] = block;
     }
 
-    public MoveResult movePlayer(String gameId, String playerId, PlayerMove playerMove) {
+    public List<MoveResult> movePlayer(String gameId, String playerId, PlayerMove playerMove) {
         Board board = getOrCreateBoard(gameId);
         UUID uuid = UUID.fromString(playerId);
-        return board.movePlayer(uuid, playerMove);
+
+        List<MoveResult> results = new ArrayList<>();
+
+        if (playerMove == PlayerMove.UP) {
+            if (board.isPlayerUp(uuid)){
+                return null;
+            }
+            board.setPlayerIsUp(uuid, true);
+
+            for (int i = 0; i < 4; i++) {
+                MoveResult stepResult = board.movePlayer(uuid, playerMove);
+                results.add(stepResult);
+            }
+
+            board.setPlayerIsUp(uuid, false);
+        } else {
+            results.add(board.movePlayer(uuid, playerMove));
+        }
+
+        return results;
     }
 
     public String createNewBoard() {

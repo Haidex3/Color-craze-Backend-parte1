@@ -13,6 +13,7 @@ public class Player extends Box{
     private UUID id;
     private int col, Row;
     private int score;
+    private boolean isUp;
 
     public Player(UUID id, ColorStatus color) {
         super(color);
@@ -30,4 +31,5 @@ public class Player extends Box{
         default -> {Row = -1;
             col = -1;}
     }}
+
 }
