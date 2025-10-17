@@ -29,16 +29,25 @@ public class GameSocketController {
 
         CompletableFuture.runAsync(() -> {
             for (MoveResult result : results) {
-                messagingTemplate.convertAndSend("/topic/board." + gameId, result);
                 try {
                     Thread.sleep(80);
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                     break;
                 }
+                if (result.success()) {
+                    messagingTemplate.convertAndSend("/topic/board." + gameId, result);
+                } else {
+                    messagingTemplate.convertAndSendToUser(
+                        moveMessage.getPlayerId(),
+                        "/queue/reply",
+                        result
+                    );
+                }
             }
         });
     }
+
 
 
 }

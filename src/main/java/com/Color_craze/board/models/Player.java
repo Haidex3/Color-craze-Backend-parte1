@@ -19,6 +19,8 @@ public class Player extends Box{
         super(color);
         this.color = color;
         this.id = id;
+        this.score = 0;
+        this.isUp = false;
         switch (color) {
         case PINK -> {Row = 14;
             col = 30;}
