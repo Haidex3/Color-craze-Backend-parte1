@@ -23,7 +23,10 @@ public class Board {
     private final Object gridLock = new Object();
     private final List<UUID> lockQueue = new ArrayList<>();
 
-    public Board() {
+    private final String gameId;
+
+    public Board(String gameId) {
+        this.gameId = gameId;
         this.grid = new Box[ROWS][COLS];
         this.players = new HashMap<>();
         initBoard();
@@ -35,6 +38,10 @@ public class Board {
                 grid[r][c] = new Box(ColorStatus.WHITE);
             }
         }
+    }
+
+    public String getGameId() {
+        return gameId;
     }
 
     public void addPlayer(Player player) {

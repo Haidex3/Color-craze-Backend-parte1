@@ -1,12 +1,14 @@
 package com.Color_craze.board.controllers;
 
+import com.Color_craze.WaitingRoom.dtos.Responses.WaitingRoomState;
+import com.Color_craze.WaitingRoom.services.WaitingRoomService;
+import com.Color_craze.board.models.Board;
+import com.Color_craze.board.services.BoardService;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import lombok.RequiredArgsConstructor;
+
 import java.util.Map;
-import com.Color_craze.board.models.Player;
-import com.Color_craze.board.services.BoardService;
-import com.Color_craze.utils.enums.ColorStatus;
 
 @RestController
 @RequestMapping("/api/games")
@@ -14,16 +16,23 @@ import com.Color_craze.utils.enums.ColorStatus;
 public class GameController {
 
     private final BoardService boardService;
+    private final WaitingRoomService waitingRoomService;
 
-    @PostMapping("/create")
-    public ResponseEntity<Map<String, String>> createGame() {
-        String gameId = boardService.createNewBoard();
-        return ResponseEntity.ok(Map.of("gameId", gameId));
-    }
+    /**
+     * Crear partida a partir de una sala de espera
+     */
+    @PostMapping("/create-from-room/{roomId}")
+    public ResponseEntity<Map<String, Object>> createGameFromRoom(@PathVariable String roomId) {
+        WaitingRoomState roomState = waitingRoomService.getRoomState(roomId);
 
-    @PostMapping("/{gameId}/join")
-    public ResponseEntity<Player> joinGame(@PathVariable String gameId, ColorStatus color) {
-        Player player = boardService.addPlayerToBoard(gameId, color);
-        return ResponseEntity.ok(player);
+        if (roomState == null || roomState.getPlayers().isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Sala no existe o está vacía"));
+        }
+        Board board = boardService.createBoardWithPlayers(roomState.getRoomId(), roomState.getPlayerColors());
+        waitingRoomService.removeRoom(roomId);
+        return ResponseEntity.ok(Map.of(
+                "gameId", board.getGameId(),
+                "players", board.getPlayers()
+        ));
     }
 }

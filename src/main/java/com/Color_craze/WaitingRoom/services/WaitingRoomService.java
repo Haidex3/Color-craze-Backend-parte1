@@ -59,4 +59,8 @@ public class WaitingRoomService {
         );
     }
 
+    public void removeRoom(String roomId) {
+        rooms.remove(roomId);
+    }
+
 }

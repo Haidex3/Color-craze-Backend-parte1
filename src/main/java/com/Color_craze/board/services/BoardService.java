@@ -20,18 +20,20 @@ public class BoardService {
 
     private final Map<String, Board> boards = new ConcurrentHashMap<>();
 
-    private Board getOrCreateBoard(String gameId) {
+    public Board createBoardWithPlayers(String gameId, Map<String, ColorStatus> playerColors) {
         return boards.computeIfAbsent(gameId, id -> {
-            Board newBoard = new Board();
+            Board newBoard = new Board(id);
 
-            Player p1 = new Player(UUID.randomUUID(), ColorStatus.PINK);
-            Player p2 = new Player(UUID.randomUUID(), ColorStatus.YELLOW);
-
-            newBoard.addPlayer(p1);
-            newBoard.addPlayer(p2);
+            playerColors.forEach((playerId, color) -> {
+                Player player = new Player(UUID.fromString(playerId), color);
+                newBoard.addPlayer(player);
+            });
 
             return newBoard;
         });
+    }
+    private Board getOrCreateBoard(String gameId) {
+        return boards.computeIfAbsent(gameId, id -> new Board(id));
     }
 
     public Board getBoard(String gameId) {
@@ -69,12 +71,6 @@ public class BoardService {
         }
 
         return results;
-    }
-
-    public String createNewBoard() {
-        String gameId = UUID.randomUUID().toString();
-        boards.put(gameId, new Board());
-        return gameId;
     }
 
     public Player addPlayerToBoard(String gameId, ColorStatus color) {
