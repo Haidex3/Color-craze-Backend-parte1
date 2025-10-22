@@ -16,8 +16,8 @@ public class WaitingRoomRestController {
     private final WaitingRoomService waitingRoomService;
     private final SimpMessagingTemplate messagingTemplate;
 
-    @PostMapping("/create")
-    public ResponseEntity<WaitingRoomState> createRoom(String playerId) {
+    @PostMapping("/create/{playerId}")
+    public ResponseEntity<WaitingRoomState> createRoom(@PathVariable String playerId) {
         WaitingRoom room = waitingRoomService.createRoom();
         WaitingRoomState state = new WaitingRoomState(
                 room.getRoomId(),
