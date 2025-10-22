@@ -5,18 +5,32 @@ import com.Color_craze.WaitingRoom.models.WaitingRoom;
 import com.Color_craze.utils.enums.ColorStatus;
 import org.springframework.stereotype.Service;
 
+import java.security.SecureRandom;
 import java.util.Map;
 import java.util.Optional;
-import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Service
 public class WaitingRoomService {
 
     private final Map<String, WaitingRoom> rooms = new ConcurrentHashMap<>();
+    private static final String CHARACTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+    private static final int ROOM_ID_LENGTH = 8;
+    private final SecureRandom random = new SecureRandom();
+
+    private String generateRoomId() {
+        StringBuilder sb = new StringBuilder(ROOM_ID_LENGTH);
+        for (int i = 0; i < ROOM_ID_LENGTH; i++) {
+            sb.append(CHARACTERS.charAt(random.nextInt(CHARACTERS.length())));
+        }
+        return sb.toString();
+    }
 
     public WaitingRoom createRoom() {
-        String roomId = UUID.randomUUID().toString();
+        String roomId;
+        do {
+            roomId = generateRoomId();
+        } while (rooms.containsKey(roomId));
         WaitingRoom room = new WaitingRoom(roomId);
         rooms.put(roomId, room);
         return room;
