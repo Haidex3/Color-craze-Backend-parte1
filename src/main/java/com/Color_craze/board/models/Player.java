@@ -13,11 +13,14 @@ public class Player extends Box{
     private UUID id;
     private int col, Row;
     private int score;
+    private boolean isUp;
 
     public Player(UUID id, ColorStatus color) {
         super(color);
         this.color = color;
         this.id = id;
+        this.score = 0;
+        this.isUp = false;
         switch (color) {
         case PINK -> {Row = 14;
             col = 30;}
@@ -30,4 +33,5 @@ public class Player extends Box{
         default -> {Row = -1;
             col = -1;}
     }}
+
 }

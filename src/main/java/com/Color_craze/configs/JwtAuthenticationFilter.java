@@ -18,10 +18,9 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
-/**
- * Filtro JWT para autenticar peticiones usando usuarios almacenados en MongoDB.
- */
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
@@ -35,9 +34,13 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             @NonNull HttpServletResponse response,
             @NonNull FilterChain filterChain) throws ServletException, IOException {
 
+        log.debug("→ Iniciando JwtAuthenticationFilter para: {}", request.getRequestURI());
+
         final String authHeader = request.getHeader("Authorization");
+
+        // Si no hay token, dejamos pasar la request
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-            // No hay token, continuar la cadena de filtros
+            log.debug("No hay token JWT, continuando cadena de filtros");
             filterChain.doFilter(request, response);
             return;
         }
@@ -45,12 +48,10 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         final String jwt = authHeader.substring(7);
         final String username = jwtService.extractUsername(jwt);
 
-        // Si tenemos username y no hay autenticación previa en el contexto
+        // Solo autenticar si no hay autenticación previa
         if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-            // Recupera el usuario desde Mongo a través de UserDetailsServiceImpl
             UserDetails userDetails = this.userDetailsService.loadUserByUsername(username);
 
-            // Valida el token
             if (jwtService.isTokenValid(jwt, userDetails)) {
                 UsernamePasswordAuthenticationToken authToken =
                         new UsernamePasswordAuthenticationToken(
@@ -58,10 +59,18 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                                 null,
                                 userDetails.getAuthorities());
                 authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+
                 SecurityContextHolder.getContext().setAuthentication(authToken);
+                log.debug("Autenticación JWT exitosa para usuario: {}", username);
+            } else {
+                log.debug("Token JWT inválido para usuario: {}", username);
             }
+        } else if (SecurityContextHolder.getContext().getAuthentication() != null) {
+            log.debug("Ya existe autenticación previa, saltando JWT filter");
         }
 
+        // Continuar con la cadena de filtros
         filterChain.doFilter(request, response);
+        log.debug("← Saliendo JwtAuthenticationFilter para: {}", request.getRequestURI());
     }
 }

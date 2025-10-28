@@ -23,7 +23,10 @@ public class Board {
     private final Object gridLock = new Object();
     private final List<UUID> lockQueue = new ArrayList<>();
 
-    public Board() {
+    private final String gameId;
+
+    public Board(String gameId) {
+        this.gameId = gameId;
         this.grid = new Box[ROWS][COLS];
         this.players = new HashMap<>();
         initBoard();
@@ -35,6 +38,10 @@ public class Board {
                 grid[r][c] = new Box(ColorStatus.WHITE);
             }
         }
+    }
+
+    public String getGameId() {
+        return gameId;
     }
 
     public void addPlayer(Player player) {
@@ -68,12 +75,12 @@ public class Board {
         }
 
         if (newRow < 0 || newRow >= ROWS || newCol < 0 || newCol >= COLS) {
-            return new MoveResult(currentRow, currentCol, List.of(), List.of(), false);
+            return new MoveResult(playerId, currentRow, currentCol, List.of(), List.of(), false);
         }
 
         Box destination = grid[newRow][newCol];
         if (destination instanceof Platform || destination instanceof Player) {
-            return new MoveResult(currentRow, currentCol, List.of(), List.of(), false);
+            return new MoveResult(playerId, currentRow, currentCol, List.of(), List.of(), false);
         }
 
         synchronized (getGridLock(playerId)) {
@@ -82,7 +89,7 @@ public class Board {
                     getGridLock(playerId).wait();
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
-                    return new MoveResult(currentRow, currentCol, List.of(), List.of(), false);
+                    return new MoveResult(playerId, currentRow, currentCol, List.of(), List.of(), false);
                 }
             }
 
@@ -94,7 +101,7 @@ public class Board {
 
                 List<PlayerUpdate> affectedPlayers = new ArrayList<>();
                 List<PlatformUpdate> updatedPlatforms = updateAdjacentPlatforms(newRow, newCol, player.getColor(), affectedPlayers);
-                return new MoveResult(newRow, newCol, updatedPlatforms, affectedPlayers, true);
+                return new MoveResult(playerId, newRow, newCol, updatedPlatforms, affectedPlayers, true);
             } finally {
                 releaseLock(playerId);
                 getGridLock(playerId).notifyAll();
@@ -168,6 +175,14 @@ public class Board {
         return players;
     }
 
+    public void setPlayerIsUp(UUID uuid, boolean b) {
+        players.get(uuid).setUp(b);
+    }
+
+    public boolean isPlayerUp(UUID uuid) {
+        return players.get(uuid).isUp();
+    }
+    
     //Herramientas para el bloqueo 
 
     private Object getGridLock(UUID playerId) {
