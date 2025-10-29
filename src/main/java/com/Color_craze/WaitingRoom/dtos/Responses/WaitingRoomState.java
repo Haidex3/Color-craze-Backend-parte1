@@ -14,4 +14,5 @@ public class WaitingRoomState {
     private Set<String> players;
     private Map<String, ColorStatus> playerColors;
     private boolean isFull;
+    private int seconds; // tiempo restante en segundos --- IGNORE ---
 }

@@ -3,20 +3,31 @@ package com.Color_craze.WaitingRoom.services;
 import com.Color_craze.WaitingRoom.dtos.Responses.WaitingRoomState;
 import com.Color_craze.WaitingRoom.models.WaitingRoom;
 import com.Color_craze.utils.enums.ColorStatus;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 
 import java.security.SecureRandom;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 @Service
 public class WaitingRoomService {
 
     private final Map<String, WaitingRoom> rooms = new ConcurrentHashMap<>();
+    private final SimpMessagingTemplate messagingTemplate;
+
     private static final String CHARACTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
     private static final int ROOM_ID_LENGTH = 8;
+    private static final int DEFAULT_WAIT_SECONDS = 30;
     private final SecureRandom random = new SecureRandom();
+
+    public WaitingRoomService(SimpMessagingTemplate messagingTemplate) {
+        this.messagingTemplate = messagingTemplate;
+    }
 
     private String generateRoomId() {
         StringBuilder sb = new StringBuilder(ROOM_ID_LENGTH);
@@ -31,9 +42,35 @@ public class WaitingRoomService {
         do {
             roomId = generateRoomId();
         } while (rooms.containsKey(roomId));
-        WaitingRoom room = new WaitingRoom(roomId);
+
+        WaitingRoom room = new WaitingRoom(roomId, DEFAULT_WAIT_SECONDS);
         rooms.put(roomId, room);
+        startCountdown(room); // ✅ Countdown con WebSocket
         return room;
+    }
+
+    private void startCountdown(WaitingRoom room) {
+        ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
+        scheduler.scheduleAtFixedRate(() -> {
+            synchronized (room) {
+                if (room.getSeconds() > 0) {
+                    room.setSeconds(room.getSeconds() - 1);
+
+                    // 🔹 Enviar tiempo restante a todos los jugadores
+                    WaitingRoomState state = new WaitingRoomState(
+                            room.getRoomId(),
+                            room.getPlayers(),
+                            room.getPlayerColors(),
+                            room.isFull(),
+                            room.getSeconds()
+                    );
+                    messagingTemplate.convertAndSend("/topic/waiting-room/" + room.getRoomId(), state);
+
+                } else {
+                    scheduler.shutdown();
+                }
+            }
+        }, 0, 1, TimeUnit.SECONDS);
     }
 
     public Optional<WaitingRoom> getRoom(String roomId) {
@@ -69,7 +106,8 @@ public class WaitingRoomService {
                 room.getRoomId(),
                 room.getPlayers(),
                 room.getPlayerColors(),
-                room.isFull()
+                room.isFull(),
+                room.getSeconds()
         );
     }
 
