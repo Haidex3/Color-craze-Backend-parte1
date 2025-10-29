@@ -5,8 +5,7 @@ import com.Color_craze.utils.enums.ColorStatus;
 import lombok.Getter;
 
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.CopyOnWriteArraySet;
+import java.util.concurrent.*;
 
 @Getter
 public class WaitingRoom {
@@ -15,12 +14,16 @@ public class WaitingRoom {
     private final Map<String, ColorStatus> playerColors;
     private final Set<String> players;
     private final int maxPlayers;
+    
+    private int seconds;
+    private ScheduledExecutorService scheduler;
 
-    public WaitingRoom(String roomId) {
+    public WaitingRoom(String roomId, int seconds) {
         this.roomId = roomId;
         this.maxPlayers = 4;
         this.players = new CopyOnWriteArraySet<>();
         this.playerColors = new ConcurrentHashMap<>();
+        this.seconds = seconds;
     }
 
     private List<ColorStatus> getAvailableColors() {
@@ -47,12 +50,12 @@ public class WaitingRoom {
                 roomId,
                 Collections.unmodifiableSet(players),
                 Collections.unmodifiableMap(playerColors),
-                isFull()
+                isFull(),
+                seconds
             );
         }
         return null;
     }
-
 
     public synchronized boolean removePlayer(String playerId) {
         playerColors.remove(playerId);
@@ -69,5 +72,34 @@ public class WaitingRoom {
 
     public synchronized boolean isFull() {
         return players.size() >= maxPlayers;
+    }
+
+    public void startCountdown() {
+        scheduler = Executors.newSingleThreadScheduledExecutor();
+        scheduler.scheduleAtFixedRate(() -> {
+            synchronized (this) {
+                if (seconds > 0) {
+                    seconds--;
+                    System.out.println("Sala " + roomId + " tiempo restante: " + seconds + "s");
+                } else {
+                    System.out.println("Sala " + roomId + " terminó el tiempo de espera");
+                    stopCountdown();
+                }
+            }
+        }, 0, 1, TimeUnit.SECONDS);
+    }
+
+    public void stopCountdown() {
+        if (scheduler != null && !scheduler.isShutdown()) {
+            scheduler.shutdown();
+        }
+    }
+
+    public int getSeconds() {
+        return seconds;
+    }
+
+    public void setSeconds(int seconds) {
+        this.seconds = seconds;
     }
 }

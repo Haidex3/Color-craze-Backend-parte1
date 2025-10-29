@@ -23,7 +23,8 @@ public class WaitingRoomRestController {
                 room.getRoomId(),
                 room.getPlayers(),
                 room.getPlayerColors(),
-                room.isFull()
+                room.isFull(),
+                room.getSeconds()   
         );
         state = waitingRoomService.joinRoom(room.getRoomId(), playerId);
         return ResponseEntity.ok(state);
