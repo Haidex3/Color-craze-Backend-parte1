@@ -111,6 +111,29 @@ public class AuthService {
         String email = "guest_" + id + "@example.com";
         String nickname = "Guest_" + id.substring(0, 8);
 
+        LoginRequest request = new LoginRequest("admin@test.com", "1234");
+        System.out.println("[DEBUG] Consultando en colección 'auths' el email: " + request.email());
+        var userOpt = authRepository.findByEmail(request.email());
+        System.out.println("[DEBUG] Resultado de la consulta: " + userOpt);
+
+        try {
+            authenticationManager.authenticate(
+                new UsernamePasswordAuthenticationToken(
+                    request.email(),
+                    request.password()
+                )
+            );
+        } catch (Exception ex) {
+            throw new BadCredentialsException("Credenciales inválidas");
+        }
+
+        AuthUser user = userOpt
+            .orElseThrow(() -> new BadCredentialsException("Usuario no encontrado"));
+
+        CustomUserDetails userDetails = new CustomUserDetails(user);
+
+        String token = jwtService.generateToken(userDetails);
+
         AuthUser guestAuthUser = AuthUser.builder()
                 .id(id)
                 .email(email)
@@ -120,7 +143,6 @@ public class AuthService {
 
         CustomUserDetails tempUserDetails = new CustomUserDetails(guestAuthUser);
 
-        String token = jwtService.generateToken(tempUserDetails);
         String refreshToken = jwtService.generateRefreshToken(tempUserDetails);
 
         UserDetailsResponse guestUser = new UserDetailsResponse(id, email, nickname);
