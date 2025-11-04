@@ -25,7 +25,7 @@ public class WaitingRoomService {
 
     private static final String CHARACTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
     private static final int ROOM_ID_LENGTH = 6;
-    private static final int DEFAULT_WAIT_SECONDS = 30;
+    private static final int DEFAULT_WAIT_SECONDS = 5;
     private final SecureRandom random = new SecureRandom();
 
     public WaitingRoomService(SimpMessagingTemplate messagingTemplate, BoardService boardService) {

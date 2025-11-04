@@ -48,6 +48,7 @@ public class SecurityConfig {
                                 "/v3/api-docs/**",
                                 "/color-craze/ws/**",
                                 "/ws/**",
+                                "/api/games/**",
                                 "/api/waiting-room/**"
                         ).permitAll()
                         .anyRequest().authenticated())

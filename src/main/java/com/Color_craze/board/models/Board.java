@@ -38,6 +38,8 @@ public class Board {
                 grid[r][c] = new Box(ColorStatus.WHITE);
             }
         }
+
+        grid[7][15] = new Platform(ColorStatus.WHITE);
     }
 
     public String getGameId() {
