@@ -25,12 +25,26 @@ public class Board {
 
     private final String gameId;
 
-    public Board(String gameId) {
+    public Board(String gameId, Map<String, ColorStatus> playerColors) {
         this.gameId = gameId;
         this.grid = new Box[ROWS][COLS];
         this.players = new HashMap<>();
         initBoard();
+        addPlayersToBoard(playerColors);
     }
+
+    private void addPlayersToBoard(Map<String, ColorStatus> playerColors) {
+        System.out.println("Adding players to board: " + playerColors);
+        if (playerColors == null) return;
+
+        for (Map.Entry<String, ColorStatus> entry : playerColors.entrySet()) {
+            UUID playerId = UUID.fromString(entry.getKey()); 
+            ColorStatus color = entry.getValue();
+            Player player = new Player(playerId, color);
+            addPlayer(player);
+        }
+    }
+
 
     private void initBoard() {
         for (int r = 0; r < ROWS; r++) {
