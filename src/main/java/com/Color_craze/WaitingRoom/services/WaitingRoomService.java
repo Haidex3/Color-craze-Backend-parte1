@@ -2,6 +2,8 @@ package com.Color_craze.WaitingRoom.services;
 
 import com.Color_craze.WaitingRoom.dtos.Responses.WaitingRoomState;
 import com.Color_craze.WaitingRoom.models.WaitingRoom;
+import com.Color_craze.board.models.Board;
+import com.Color_craze.board.services.BoardService;
 import com.Color_craze.utils.enums.ColorStatus;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
@@ -19,14 +21,16 @@ public class WaitingRoomService {
 
     private final Map<String, WaitingRoom> rooms = new ConcurrentHashMap<>();
     private final SimpMessagingTemplate messagingTemplate;
+    private final BoardService boardService;
 
     private static final String CHARACTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-    private static final int ROOM_ID_LENGTH = 8;
+    private static final int ROOM_ID_LENGTH = 6;
     private static final int DEFAULT_WAIT_SECONDS = 30;
     private final SecureRandom random = new SecureRandom();
 
-    public WaitingRoomService(SimpMessagingTemplate messagingTemplate) {
+    public WaitingRoomService(SimpMessagingTemplate messagingTemplate, BoardService boardService) {
         this.messagingTemplate = messagingTemplate;
+        this.boardService = boardService;
     }
 
     private String generateRoomId() {
@@ -45,7 +49,7 @@ public class WaitingRoomService {
 
         WaitingRoom room = new WaitingRoom(roomId, DEFAULT_WAIT_SECONDS);
         rooms.put(roomId, room);
-        startCountdown(room); // ✅ Countdown con WebSocket
+        startCountdown(room);
         return room;
     }
 
@@ -56,7 +60,6 @@ public class WaitingRoomService {
                 if (room.getSeconds() > 0) {
                     room.setSeconds(room.getSeconds() - 1);
 
-                    // 🔹 Enviar tiempo restante a todos los jugadores
                     WaitingRoomState state = new WaitingRoomState(
                             room.getRoomId(),
                             room.getPlayers(),
@@ -68,6 +71,18 @@ public class WaitingRoomService {
 
                 } else {
                     scheduler.shutdown();
+                    try {
+                        Map<String, ColorStatus> playerColors = room.getPlayerColors();
+                        if (!playerColors.isEmpty()) {
+                            Board board = boardService.createBoardWithPlayers(room.getRoomId(), playerColors);
+
+                            messagingTemplate.convertAndSend("/topic/waiting-room/" + room.getRoomId() + "/start", board);
+                        }
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+
+                    rooms.remove(room.getRoomId());
                 }
             }
         }, 0, 1, TimeUnit.SECONDS);

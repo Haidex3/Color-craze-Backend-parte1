@@ -30,6 +30,7 @@ public class LoggingContextFilter extends OncePerRequestFilter {
 
         // Obtiene el correlationId del encabezado o genera uno nuevo
         String id = request.getHeader(HEADER_NAME);
+        System.out.println("[DEBUG] CorrelationId recibido: " + id);
         if (id == null || id.isBlank()) {
             id = UUID.randomUUID().toString();
         }
@@ -46,5 +47,18 @@ public class LoggingContextFilter extends OncePerRequestFilter {
         } finally {
             MDC.clear(); // Limpia el contexto para evitar fugas entre peticiones
         }
+    }
+
+    /**
+     * Evita aplicar el filtro a las rutas de WebSocket (handshake).
+     */
+    @Override
+    protected boolean shouldNotFilter(HttpServletRequest request) throws ServletException {
+        String path = request.getRequestURI();
+        return path.startsWith("/ws")
+                || path.startsWith("/color-craze/ws")
+                || path.contains("/ws/info")
+                || path.contains("/ws/connect")
+                || path.endsWith("/websocket");
     }
 }
