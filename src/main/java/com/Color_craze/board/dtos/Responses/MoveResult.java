@@ -9,5 +9,6 @@ public record MoveResult(
     int newCol,
     List<PlatformUpdate> platforms,
     List<PlayerUpdate> affectedPlayers,
-    boolean success
+    boolean success,
+    boolean gravity
 ) {}

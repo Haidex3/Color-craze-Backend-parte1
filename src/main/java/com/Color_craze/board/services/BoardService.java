@@ -14,6 +14,8 @@ import com.Color_craze.board.models.Platform;
 import com.Color_craze.board.models.Player;
 import com.Color_craze.board.models.Board;
 import com.Color_craze.board.dtos.Responses.MoveResult;
+import com.Color_craze.board.dtos.Responses.PlatformUpdate;
+import com.Color_craze.board.dtos.Responses.PlayerUpdate;
 import com.Color_craze.utils.enums.ColorStatus;
 import com.Color_craze.utils.enums.PlayerMove;
 
@@ -27,12 +29,9 @@ public class BoardService {
      * Si el gameId ya existe, lanza excepción.
      */
     public Board createBoardWithPlayers(String gameId, Map<String, ColorStatus> playerColors) {
-        System.out.println("Intentando crear tablero con id: " + gameId + "colores de jugadores: " + playerColors);
         if (boards.containsKey(gameId)) {
             throw new IllegalStateException("El tablero con id " + gameId + " ya existe");
         }
-
-        System.out.println("Creando nuevo tablero con jugadores para gameId: " + gameId);
 
         Board newBoard = new Board(gameId, playerColors);
         if (playerColors != null) {
@@ -73,42 +72,47 @@ public class BoardService {
         List<MoveResult> results = new ArrayList<>();
 
         if (playerMove == PlayerMove.UP) {
-            if (board.isPlayerUp(uuid) || !(board.getRowDownPLayer(playerId) instanceof Platform) ) {
+            if (board.isPlayerUp(uuid) || !(board.getRowDownPLayer(playerId) instanceof Platform)) {
                 return null;
             }
+
             board.setPlayerIsUp(uuid, true);
 
+            List<PlatformUpdate> totalPlatformUpdates = new ArrayList<>();
+            List<PlayerUpdate> totalPlayerUpdates = new ArrayList<>();
+            MoveResult lastStep = null;
+
             for (int i = 0; i < 4; i++) {
-                MoveResult stepResult = board.movePlayer(uuid, playerMove);
-                results.add(stepResult);
+                MoveResult stepResult = board.movePlayer(uuid, PlayerMove.UP);
+                if (stepResult == null) break;
+
+                totalPlatformUpdates.addAll(stepResult.platforms());
+                totalPlayerUpdates.addAll(stepResult.affectedPlayers());
+                lastStep = stepResult;
             }
 
             board.setPlayerIsUp(uuid, false);
-        } else {
+
+            if (lastStep != null) {
+                MoveResult finalResult = new MoveResult(
+                    uuid,
+                    lastStep.newRow(),
+                    lastStep.newCol(),
+                    totalPlatformUpdates,
+                    totalPlayerUpdates,
+                    lastStep.success(),
+                    lastStep.gravity()
+                );
+                results.add(finalResult);
+            }
+
+            return results;
+        }
+
+        else {
             results.add(board.movePlayer(uuid, playerMove));
         }
-
         return results;
-    }
-
-    public List<MoveResult> applyGravity(String gameId) {
-        Board board = getBoard(gameId);
-        List<MoveResult> results = new ArrayList<>();
-
-        for (Player player : board.getPlayers().values()) {
-            if (!player.isUp() && !isStandingOnPlatform(board, player)) {
-                results.add(board.movePlayer(player.getId(), PlayerMove.DOWN));
-            }
-        }
-
-        return results;
-    }
-
-    private boolean isStandingOnPlatform(Board board, Player player) {
-        int rowBelow = player.getRow() + 1;
-        if (rowBelow >= board.getGrid().length) return true;
-        Box below = board.getGrid()[rowBelow][player.getCol()];
-        return below instanceof Platform || below instanceof Player;
     }
 
 

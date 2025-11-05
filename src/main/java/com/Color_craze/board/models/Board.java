@@ -35,7 +35,6 @@ public class Board {
     }
 
     private void addPlayersToBoard(Map<String, ColorStatus> playerColors) {
-        System.out.println("Adding players to board: " + playerColors);
         if (playerColors == null) return;
 
         for (Map.Entry<String, ColorStatus> entry : playerColors.entrySet()) {
@@ -138,12 +137,12 @@ public class Board {
         }
 
         if (newRow < 0 || newRow >= ROWS || newCol < 0 || newCol >= COLS) {
-            return new MoveResult(playerId, currentRow, currentCol, List.of(), List.of(), false);
+            return new MoveResult(playerId, currentRow, currentCol, List.of(), List.of(), false, false);
         }
 
         Box destination = grid[newRow][newCol];
         if (destination instanceof Platform || destination instanceof Player) {
-            return new MoveResult(playerId, currentRow, currentCol, List.of(), List.of(), false);
+            return new MoveResult(playerId, currentRow, currentCol, List.of(), List.of(), false, false);
         }
 
         synchronized (getGridLock(playerId)) {
@@ -152,7 +151,7 @@ public class Board {
                     getGridLock(playerId).wait();
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
-                    return new MoveResult(playerId, currentRow, currentCol, List.of(), List.of(), false);
+                    return new MoveResult(playerId, currentRow, currentCol, List.of(), List.of(), false, false);
                 }
             }
 
@@ -164,7 +163,11 @@ public class Board {
 
                 List<PlayerUpdate> affectedPlayers = new ArrayList<>();
                 List<PlatformUpdate> updatedPlatforms = updateAdjacentPlatforms(newRow, newCol, player.getColor(), affectedPlayers);
-                return new MoveResult(playerId, newRow, newCol, updatedPlatforms, affectedPlayers, true);
+                if(grid[newRow+1][newCol] instanceof Platform || grid[newRow+1][newCol] instanceof Player) {
+                    System.out.println("No gravity applied for player " + playerId);
+                    return new MoveResult(playerId, newRow, newCol, updatedPlatforms, affectedPlayers, true, false);
+                }
+                return new MoveResult(playerId, newRow, newCol, updatedPlatforms, affectedPlayers, true, true);
             } finally {
                 releaseLock(playerId);
                 getGridLock(playerId).notifyAll();

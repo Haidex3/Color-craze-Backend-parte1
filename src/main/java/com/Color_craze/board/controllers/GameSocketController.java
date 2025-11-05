@@ -1,6 +1,5 @@
 package com.Color_craze.board.controllers;
 
-
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
@@ -8,12 +7,12 @@ import org.springframework.messaging.handler.annotation.DestinationVariable;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Controller;
 
 import com.Color_craze.board.dtos.Requests.PlayerMoveMessage;
 import com.Color_craze.board.dtos.Responses.MoveResult;
 import com.Color_craze.board.services.BoardService;
+import com.Color_craze.utils.enums.PlayerMove;
 
 import lombok.RequiredArgsConstructor;
 
@@ -36,33 +35,40 @@ public class GameSocketController {
                     Thread.currentThread().interrupt();
                     break;
                 }
-                if (result.success()) {
-                    messagingTemplate.convertAndSend("/topic/board." + gameId, result);
-                } else {
-                    messagingTemplate.convertAndSendToUser(
-                        moveMessage.getPlayerId(),
-                        "/queue/reply",
-                        result
-                    );
+                messagingTemplate.convertAndSend("/topic/board." + gameId, result);
+                System.out.println("Sent move result: " + result.gravity());
+                if (result.gravity()) {
+                    applyGravity(gameId, moveMessage.getPlayerId());
                 }
             }
         });
     }
 
+    /**
+     * Aplica gravedad al jugador: sigue moviéndolo hacia abajo hasta que no pueda seguir cayendo.
+     */
+    private void applyGravity(String gameId, String playerId) {
+        boolean continueFalling = true;
 
-    @Scheduled(fixedDelay = 300)
-    public void gravityTick() {
-        System.out.println("Aplicando gravedad a todos los tableros");
-        for (String gameId : boardService.getAllBoardIds()) {
-            List<MoveResult> gravityResults = boardService.applyGravity(gameId);
+        while (continueFalling) {
+            try {
+                Thread.sleep(300);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                break;
+            }
 
-            for (MoveResult result : gravityResults) {
-                if (result.success()) {
-                    messagingTemplate.convertAndSend("/topic/board." + gameId, result);
+            List<MoveResult> gravityResults = boardService.movePlayer(gameId, playerId, PlayerMove.DOWN);
+            if (gravityResults == null || gravityResults.isEmpty()) break;
+
+            for (MoveResult gravityStep : gravityResults) {
+                messagingTemplate.convertAndSend("/topic/board." + gameId, gravityStep);
+
+                if (!gravityStep.gravity()) {
+                    continueFalling = false;
+                    break;
                 }
             }
         }
     }
-
-
 }
