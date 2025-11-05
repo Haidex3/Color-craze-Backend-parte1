@@ -52,7 +52,7 @@ public class GameSocketController {
 
         while (continueFalling) {
             try {
-                Thread.sleep(300);
+                Thread.sleep(100);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 break;
