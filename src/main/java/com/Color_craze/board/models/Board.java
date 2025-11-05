@@ -45,15 +45,61 @@ public class Board {
         }
     }
 
-
     private void initBoard() {
         for (int r = 0; r < ROWS; r++) {
             for (int c = 0; c < COLS; c++) {
-                grid[r][c] = new Box(ColorStatus.WHITE);
+                grid[r][c] = new Box(ColorStatus.GREEN);
             }
         }
 
-        grid[7][15] = new Platform(ColorStatus.WHITE);
+        List<Position> platforms = generatePlatforms(ROWS, COLS);
+        for (Position pos : platforms) {
+            grid[pos.getRow()][pos.getCol()] = new Platform(ColorStatus.WHITE);
+        }
+    }
+
+    private List<Position> generatePlatforms(int rows, int cols) {
+        List<Position> platforms = new ArrayList<>();
+
+        platforms.add(new Position(9, 1));
+        platforms.add(new Position(9, 29));
+        platforms.add(new Position(10, 15));
+        platforms.add(new Position(11, 16));
+        platforms.add(new Position(11, 14));
+        platforms.add(new Position(12, 13));
+        platforms.add(new Position(12, 17));
+
+        for (int i = 0; i < cols; i++) {
+            platforms.add(new Position(0, i));
+            platforms.add(new Position(rows - 1, i));
+
+            if (i >= 8 && i <= 22) platforms.add(new Position(3, i));
+            if ((i >= 3 && i < 6) || (i > 24 && i <= 27)) platforms.add(new Position(6, i));
+            if ((i >= 6 && i <= 9) || (i >= 21 && i <= 24)) platforms.add(new Position(7, i));
+            if ((i >= 4 && i <= 8) || (i >= 22 && i <= 26)) platforms.add(new Position(11, i));
+        }
+
+        for (int i = 0; i < rows; i++) {
+            if (i != 9) {
+                platforms.add(new Position(i, 0));
+                platforms.add(new Position(i, cols - 1));
+            }
+        }
+
+        return platforms;
+    }
+
+    private static class Position {
+        private final int row;
+        private final int col;
+
+        public Position(int row, int col) {
+            this.row = row;
+            this.col = col;
+        }
+
+        public int getRow() { return row; }
+        public int getCol() { return col; }
     }
 
     public String getGameId() {
