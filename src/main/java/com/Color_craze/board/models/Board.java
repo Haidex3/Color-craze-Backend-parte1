@@ -9,6 +9,7 @@ import java.util.UUID;
 import com.Color_craze.board.dtos.Responses.MoveResult;
 import com.Color_craze.board.dtos.Responses.PlatformUpdate;
 import com.Color_craze.board.dtos.Responses.PlayerUpdate;
+import com.Color_craze.users.controllers.prueba;
 import com.Color_craze.utils.enums.ColorStatus;
 import com.Color_craze.utils.enums.PlayerMove;
 
@@ -25,19 +26,80 @@ public class Board {
 
     private final String gameId;
 
-    public Board(String gameId) {
+    public Board(String gameId, Map<String, ColorStatus> playerColors) {
         this.gameId = gameId;
         this.grid = new Box[ROWS][COLS];
         this.players = new HashMap<>();
         initBoard();
+        addPlayersToBoard(playerColors);
+    }
+
+    private void addPlayersToBoard(Map<String, ColorStatus> playerColors) {
+        if (playerColors == null) return;
+
+        for (Map.Entry<String, ColorStatus> entry : playerColors.entrySet()) {
+            UUID playerId = UUID.fromString(entry.getKey()); 
+            ColorStatus color = entry.getValue();
+            Player player = new Player(playerId, color);
+            addPlayer(player);
+        }
     }
 
     private void initBoard() {
         for (int r = 0; r < ROWS; r++) {
             for (int c = 0; c < COLS; c++) {
-                grid[r][c] = new Box(ColorStatus.WHITE);
+                grid[r][c] = new Box(ColorStatus.GREEN);
             }
         }
+
+        List<Position> platforms = generatePlatforms(ROWS, COLS);
+        for (Position pos : platforms) {
+            grid[pos.getRow()][pos.getCol()] = new Platform(ColorStatus.WHITE);
+        }
+    }
+
+    private List<Position> generatePlatforms(int rows, int cols) {
+        List<Position> platforms = new ArrayList<>();
+
+        platforms.add(new Position(9, 1));
+        platforms.add(new Position(9, 29));
+        platforms.add(new Position(10, 15));
+        platforms.add(new Position(11, 16));
+        platforms.add(new Position(11, 14));
+        platforms.add(new Position(12, 13));
+        platforms.add(new Position(12, 17));
+
+        for (int i = 0; i < cols; i++) {
+            platforms.add(new Position(0, i));
+            platforms.add(new Position(rows - 1, i));
+
+            if (i >= 8 && i <= 22) platforms.add(new Position(3, i));
+            if ((i >= 3 && i < 6) || (i > 24 && i <= 27)) platforms.add(new Position(6, i));
+            if ((i >= 6 && i <= 9) || (i >= 21 && i <= 24)) platforms.add(new Position(7, i));
+            if ((i >= 4 && i <= 8) || (i >= 22 && i <= 26)) platforms.add(new Position(11, i));
+        }
+
+        for (int i = 0; i < rows; i++) {
+            if (i != 9) {
+                platforms.add(new Position(i, 0));
+                platforms.add(new Position(i, cols - 1));
+            }
+        }
+
+        return platforms;
+    }
+
+    private static class Position {
+        private final int row;
+        private final int col;
+
+        public Position(int row, int col) {
+            this.row = row;
+            this.col = col;
+        }
+
+        public int getRow() { return row; }
+        public int getCol() { return col; }
     }
 
     public String getGameId() {
@@ -75,12 +137,20 @@ public class Board {
         }
 
         if (newRow < 0 || newRow >= ROWS || newCol < 0 || newCol >= COLS) {
-            return new MoveResult(playerId, currentRow, currentCol, List.of(), List.of(), false);
+            if(grid[newRow+1][newCol] instanceof Platform) {
+                System.out.println("No gravity applied for player " + playerId+ newRow + "," + newCol);
+                return new MoveResult(playerId, currentRow, currentCol, List.of(), List.of(), false, false);
+            }
+            return new MoveResult(playerId, currentRow, currentCol, List.of(), List.of(), false, true);
         }
 
         Box destination = grid[newRow][newCol];
         if (destination instanceof Platform || destination instanceof Player) {
-            return new MoveResult(playerId, currentRow, currentCol, List.of(), List.of(), false);
+            if(grid[newRow+1][newCol] instanceof Platform) {
+                System.out.println("No gravity applied for player " + playerId+ newRow + "," + newCol);
+                return new MoveResult(playerId, currentRow, currentCol, List.of(), List.of(), false, false);
+            }
+            return new MoveResult(playerId, currentRow, currentCol, List.of(), List.of(), false, true);
         }
 
         synchronized (getGridLock(playerId)) {
@@ -89,7 +159,11 @@ public class Board {
                     getGridLock(playerId).wait();
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
-                    return new MoveResult(playerId, currentRow, currentCol, List.of(), List.of(), false);
+                    if(grid[newRow+1][newCol] instanceof Platform) {
+                        System.out.println("No gravity applied for player " + playerId+ newRow + "," + newCol);
+                        return new MoveResult(playerId, currentRow, currentCol, List.of(), List.of(), false, false);
+                    }
+                    return new MoveResult(playerId, currentRow, currentCol, List.of(), List.of(), false, true);
                 }
             }
 
@@ -101,7 +175,11 @@ public class Board {
 
                 List<PlayerUpdate> affectedPlayers = new ArrayList<>();
                 List<PlatformUpdate> updatedPlatforms = updateAdjacentPlatforms(newRow, newCol, player.getColor(), affectedPlayers);
-                return new MoveResult(playerId, newRow, newCol, updatedPlatforms, affectedPlayers, true);
+                if(grid[newRow+1][newCol] instanceof Platform) {
+                    System.out.println("No gravity applied for player " + playerId+ newRow + "," + newCol);
+                    return new MoveResult(playerId, newRow, newCol, updatedPlatforms, affectedPlayers, true, false);
+                }
+                return new MoveResult(playerId, newRow, newCol, updatedPlatforms, affectedPlayers, true, true);
             } finally {
                 releaseLock(playerId);
                 getGridLock(playerId).notifyAll();
@@ -207,4 +285,12 @@ public class Board {
         }
     }
 
+
+    public Box getRowDownPLayer(String playerId){
+        UUID uuid = UUID.fromString(playerId);
+        Player player = players.get(uuid);
+        int rowBelow = player.getRow() + 1;
+        if (rowBelow >= this.grid.length) return null;
+        return this.grid[rowBelow][player.getCol()];
+    }
 }

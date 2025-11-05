@@ -37,6 +37,7 @@ public class SecurityConfig {
                     corsConfig.setAllowedOrigins(java.util.List.of("http://localhost:5173", "https://green-field-0a310b90f.3.azurestaticapps.net"));
                     corsConfig.setAllowedMethods(java.util.List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
                     corsConfig.setAllowedHeaders(java.util.List.of("*"));
+                    corsConfig.setExposedHeaders(java.util.List.of("X-Correlation-ID"));
                     corsConfig.setAllowCredentials(true);
                     return corsConfig;
                 }))
@@ -47,6 +48,7 @@ public class SecurityConfig {
                                 "/v3/api-docs/**",
                                 "/color-craze/ws/**",
                                 "/ws/**",
+                                "/api/games/**",
                                 "/api/waiting-room/**"
                         ).permitAll()
                         .anyRequest().authenticated())
@@ -70,7 +72,9 @@ public class SecurityConfig {
         return path.startsWith("/api/auth")
                 || path.startsWith("/swagger-ui")
                 || path.startsWith("/v3/api-docs")
-                || path.equals("/favicon.ico");
+                || path.equals("/favicon.ico")
+                || path.startsWith("/color-craze/ws")
+                || path.startsWith("/ws"); 
     }
 
     @Bean

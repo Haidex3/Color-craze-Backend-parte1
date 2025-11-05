@@ -35,4 +35,19 @@ public class GameController {
                 "players", board.getPlayers()
         ));
     }
+
+    /**
+     * Consultar el estado completo del tablero (mapa) de un juego.
+     * Devuelve todo el Board para inicializar el mapa en el cliente.
+     */
+    @GetMapping("/{gameId}")
+    public ResponseEntity<?> getBoardState(@PathVariable String gameId) {
+        Board board = boardService.getBoard(gameId);
+
+        if (board == null) {
+            return ResponseEntity.status(404).body(Map.of("error", "Juego no encontrado"));
+        }
+
+        return ResponseEntity.ok(board);
+    }
 }

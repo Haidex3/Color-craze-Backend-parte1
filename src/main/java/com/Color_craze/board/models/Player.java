@@ -22,13 +22,13 @@ public class Player extends Box{
         this.score = 0;
         this.isUp = false;
         switch (color) {
-        case PINK -> {Row = 14;
-            col = 30;}
-        case YELLOW -> {Row = 14;
+        case RED -> {Row = 13;
+            col = 29;}
+        case YELLOW -> {Row = 13;
             col = 1;}
-        case PURPLE -> {Row = 4;
-            col = 10;}
-        case GREEN -> {Row = 4;
+        case PURPLE -> {Row = 6;
+            col = 8;}
+        case GREEN -> {Row = 6;
             col = 22;}
         default -> {Row = -1;
             col = -1;}
