@@ -9,6 +9,7 @@ import java.util.UUID;
 import com.Color_craze.board.dtos.Responses.MoveResult;
 import com.Color_craze.board.dtos.Responses.PlatformUpdate;
 import com.Color_craze.board.dtos.Responses.PlayerUpdate;
+import com.Color_craze.users.controllers.prueba;
 import com.Color_craze.utils.enums.ColorStatus;
 import com.Color_craze.utils.enums.PlayerMove;
 
@@ -269,4 +270,12 @@ public class Board {
         }
     }
 
+
+    public Box getRowDownPLayer(String playerId){
+        UUID uuid = UUID.fromString(playerId);
+        Player player = players.get(uuid);
+        int rowBelow = player.getRow() + 1;
+        if (rowBelow >= this.grid.length) return null;
+        return this.grid[rowBelow][player.getCol()];
+    }
 }

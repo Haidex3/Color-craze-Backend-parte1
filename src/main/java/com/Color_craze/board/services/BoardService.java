@@ -3,12 +3,14 @@ package com.Color_craze.board.services;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 import org.springframework.stereotype.Service;
 
 import com.Color_craze.board.models.Box;
+import com.Color_craze.board.models.Platform;
 import com.Color_craze.board.models.Player;
 import com.Color_craze.board.models.Board;
 import com.Color_craze.board.dtos.Responses.MoveResult;
@@ -71,7 +73,7 @@ public class BoardService {
         List<MoveResult> results = new ArrayList<>();
 
         if (playerMove == PlayerMove.UP) {
-            if (board.isPlayerUp(uuid)) {
+            if (board.isPlayerUp(uuid) || !(board.getRowDownPLayer(playerId) instanceof Platform) ) {
                 return null;
             }
             board.setPlayerIsUp(uuid, true);
@@ -89,6 +91,27 @@ public class BoardService {
         return results;
     }
 
+    public List<MoveResult> applyGravity(String gameId) {
+        Board board = getBoard(gameId);
+        List<MoveResult> results = new ArrayList<>();
+
+        for (Player player : board.getPlayers().values()) {
+            if (!player.isUp() && !isStandingOnPlatform(board, player)) {
+                results.add(board.movePlayer(player.getId(), PlayerMove.DOWN));
+            }
+        }
+
+        return results;
+    }
+
+    private boolean isStandingOnPlatform(Board board, Player player) {
+        int rowBelow = player.getRow() + 1;
+        if (rowBelow >= board.getGrid().length) return true;
+        Box below = board.getGrid()[rowBelow][player.getCol()];
+        return below instanceof Platform || below instanceof Player;
+    }
+
+
     /**
      * Agrega un nuevo jugador a un tablero existente.
      */
@@ -97,5 +120,9 @@ public class BoardService {
         Player newPlayer = new Player(UUID.randomUUID(), color);
         board.addPlayer(newPlayer);
         return newPlayer;
+    }
+
+    public Set<String> getAllBoardIds() {
+        return boards.keySet();
     }
 }

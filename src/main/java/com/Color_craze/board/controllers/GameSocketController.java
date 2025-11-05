@@ -8,6 +8,7 @@ import org.springframework.messaging.handler.annotation.DestinationVariable;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Controller;
 
 import com.Color_craze.board.dtos.Requests.PlayerMoveMessage;
@@ -48,6 +49,20 @@ public class GameSocketController {
         });
     }
 
+
+    @Scheduled(fixedDelay = 300)
+    public void gravityTick() {
+        System.out.println("Aplicando gravedad a todos los tableros");
+        for (String gameId : boardService.getAllBoardIds()) {
+            List<MoveResult> gravityResults = boardService.applyGravity(gameId);
+
+            for (MoveResult result : gravityResults) {
+                if (result.success()) {
+                    messagingTemplate.convertAndSend("/topic/board." + gameId, result);
+                }
+            }
+        }
+    }
 
 
 }
