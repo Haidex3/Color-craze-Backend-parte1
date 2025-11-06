@@ -9,7 +9,6 @@ import java.util.UUID;
 import com.Color_craze.board.dtos.Responses.MoveResult;
 import com.Color_craze.board.dtos.Responses.PlatformUpdate;
 import com.Color_craze.board.dtos.Responses.PlayerUpdate;
-import com.Color_craze.users.controllers.prueba;
 import com.Color_craze.utils.enums.ColorStatus;
 import com.Color_craze.utils.enums.PlayerMove;
 
@@ -137,8 +136,7 @@ public class Board {
         }
 
         if (newRow < 0 || newRow >= ROWS || newCol < 0 || newCol >= COLS) {
-            if(grid[newRow+1][newCol] instanceof Platform) {
-                System.out.println("No gravity applied for player " + playerId+ newRow + "," + newCol);
+            if(grid[currentRow+1][currentCol] instanceof Platform) {
                 return new MoveResult(playerId, currentRow, currentCol, List.of(), List.of(), false, false);
             }
             return new MoveResult(playerId, currentRow, currentCol, List.of(), List.of(), false, true);
@@ -146,8 +144,7 @@ public class Board {
 
         Box destination = grid[newRow][newCol];
         if (destination instanceof Platform || destination instanceof Player) {
-            if(grid[newRow+1][newCol] instanceof Platform) {
-                System.out.println("No gravity applied for player " + playerId+ newRow + "," + newCol);
+            if(grid[currentRow+1][currentCol] instanceof Platform) {
                 return new MoveResult(playerId, currentRow, currentCol, List.of(), List.of(), false, false);
             }
             return new MoveResult(playerId, currentRow, currentCol, List.of(), List.of(), false, true);
@@ -159,8 +156,7 @@ public class Board {
                     getGridLock(playerId).wait();
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
-                    if(grid[newRow+1][newCol] instanceof Platform) {
-                        System.out.println("No gravity applied for player " + playerId+ newRow + "," + newCol);
+                    if(grid[currentRow+1][currentCol] instanceof Platform) {
                         return new MoveResult(playerId, currentRow, currentCol, List.of(), List.of(), false, false);
                     }
                     return new MoveResult(playerId, currentRow, currentCol, List.of(), List.of(), false, true);
@@ -176,7 +172,6 @@ public class Board {
                 List<PlayerUpdate> affectedPlayers = new ArrayList<>();
                 List<PlatformUpdate> updatedPlatforms = updateAdjacentPlatforms(newRow, newCol, player.getColor(), affectedPlayers);
                 if(grid[newRow+1][newCol] instanceof Platform) {
-                    System.out.println("No gravity applied for player " + playerId+ newRow + "," + newCol);
                     return new MoveResult(playerId, newRow, newCol, updatedPlatforms, affectedPlayers, true, false);
                 }
                 return new MoveResult(playerId, newRow, newCol, updatedPlatforms, affectedPlayers, true, true);

@@ -1,5 +1,6 @@
 package com.Color_craze.board.controllers;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
@@ -11,6 +12,8 @@ import org.springframework.stereotype.Controller;
 
 import com.Color_craze.board.dtos.Requests.PlayerMoveMessage;
 import com.Color_craze.board.dtos.Responses.MoveResult;
+import com.Color_craze.board.dtos.Responses.PlatformUpdate;
+import com.Color_craze.board.dtos.Responses.PlayerUpdate;
 import com.Color_craze.board.services.BoardService;
 import com.Color_craze.utils.enums.PlayerMove;
 
@@ -28,15 +31,17 @@ public class GameSocketController {
         List<MoveResult> results = boardService.movePlayer(gameId, moveMessage.getPlayerId(), moveMessage.getDirection());
 
         CompletableFuture.runAsync(() -> {
+            if (results == null || results.isEmpty()) return;
+
             for (MoveResult result : results) {
                 try {
-                    Thread.sleep(80);
+                    Thread.sleep(110);
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                     break;
                 }
                 messagingTemplate.convertAndSend("/topic/board." + gameId, result);
-                System.out.println("Sent move result: " + result.gravity());
+
                 if (result.gravity()) {
                     applyGravity(gameId, moveMessage.getPlayerId());
                 }
@@ -45,10 +50,13 @@ public class GameSocketController {
     }
 
     /**
-     * Aplica gravedad al jugador: sigue moviéndolo hacia abajo hasta que no pueda seguir cayendo.
+     * Aplica gravedad acumulada y envía un único resultado final.
      */
     private void applyGravity(String gameId, String playerId) {
         boolean continueFalling = true;
+        List<PlatformUpdate> totalPlatformUpdates = new ArrayList<>();
+        List<PlayerUpdate> totalPlayerUpdates = new ArrayList<>();
+        MoveResult lastStep = null;
 
         while (continueFalling) {
             try {
@@ -62,13 +70,30 @@ public class GameSocketController {
             if (gravityResults == null || gravityResults.isEmpty()) break;
 
             for (MoveResult gravityStep : gravityResults) {
-                messagingTemplate.convertAndSend("/topic/board." + gameId, gravityStep);
+                if (gravityStep == null) continue;
+                totalPlatformUpdates.addAll(gravityStep.platforms());
+                totalPlayerUpdates.addAll(gravityStep.affectedPlayers());
+                lastStep = gravityStep;
 
                 if (!gravityStep.gravity()) {
                     continueFalling = false;
                     break;
                 }
             }
+        }
+
+        if (lastStep != null) {
+            MoveResult finalResult = new MoveResult(
+                lastStep.playerId(),
+                lastStep.newRow(),
+                lastStep.newCol(),
+                totalPlatformUpdates,
+                totalPlayerUpdates,
+                lastStep.success(),
+                false 
+            );
+
+            messagingTemplate.convertAndSend("/topic/board." + gameId, finalResult);
         }
     }
 }
