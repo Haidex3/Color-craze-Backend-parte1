@@ -55,27 +55,25 @@ public class Board {
         for (Position pos : platforms) {
             grid[pos.getRow()][pos.getCol()] = new Platform(ColorStatus.WHITE);
         }
+
+        grid[7][23] = new TpPlataform(2, 15);
+        grid[11][25] = new TpPlataform(6, 15);
+        grid[13][27] = new TpPlataform(10, 15);
+
+
+        
     }
 
     private List<Position> generatePlatforms(int rows, int cols) {
         List<Position> platforms = new ArrayList<>();
-
-        platforms.add(new Position(9, 1));
-        platforms.add(new Position(9, 29));
-        platforms.add(new Position(10, 15));
-        platforms.add(new Position(11, 16));
-        platforms.add(new Position(11, 14));
-        platforms.add(new Position(12, 13));
-        platforms.add(new Position(12, 17));
 
         for (int i = 0; i < cols; i++) {
             platforms.add(new Position(0, i));
             platforms.add(new Position(rows - 1, i));
 
             if (i >= 8 && i <= 22) platforms.add(new Position(3, i));
-            if ((i >= 3 && i < 6) || (i > 24 && i <= 27)) platforms.add(new Position(6, i));
-            if ((i >= 6 && i <= 9) || (i >= 21 && i <= 24)) platforms.add(new Position(7, i));
-            if ((i >= 4 && i <= 8) || (i >= 22 && i <= 26)) platforms.add(new Position(11, i));
+            if (i >= 6 && i < 24) platforms.add(new Position(7, i));
+            if (i >= 4 && i <= 26) platforms.add(new Position(11, i));
         }
 
         for (int i = 0; i < rows; i++) {
@@ -135,19 +133,13 @@ public class Board {
             case DOWN  -> newRow++;
         }
 
-        if (newRow < 0 || newRow >= ROWS || newCol < 0 || newCol >= COLS) {
-            if(grid[currentRow+1][currentCol] instanceof Platform) {
-                return new MoveResult(playerId, currentRow, currentCol, List.of(), List.of(), false, false);
-            }
-            return new MoveResult(playerId, currentRow, currentCol, List.of(), List.of(), false, true);
+        if (newRow < 0 || newRow >= ROWS || newCol < 0 || newCol >= COLS || (!(playerMove==PlayerMove.UP) && player.isUp())) {
+            return moveDownPlatform(playerId, currentRow, currentCol, List.of(),List.of());
         }
 
         Box destination = grid[newRow][newCol];
         if (destination instanceof Platform || destination instanceof Player) {
-            if(grid[currentRow+1][currentCol] instanceof Platform) {
-                return new MoveResult(playerId, currentRow, currentCol, List.of(), List.of(), false, false);
-            }
-            return new MoveResult(playerId, currentRow, currentCol, List.of(), List.of(), false, true);
+            return moveDownPlatform(playerId, currentRow, currentCol, List.of(),List.of());
         }
 
         synchronized (getGridLock(playerId)) {
@@ -156,10 +148,7 @@ public class Board {
                     getGridLock(playerId).wait();
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
-                    if(grid[currentRow+1][currentCol] instanceof Platform) {
-                        return new MoveResult(playerId, currentRow, currentCol, List.of(), List.of(), false, false);
-                    }
-                    return new MoveResult(playerId, currentRow, currentCol, List.of(), List.of(), false, true);
+                    return moveDownPlatform(playerId, currentRow, currentCol, List.of(),List.of());
                 }
             }
 
@@ -171,15 +160,35 @@ public class Board {
 
                 List<PlayerUpdate> affectedPlayers = new ArrayList<>();
                 List<PlatformUpdate> updatedPlatforms = updateAdjacentPlatforms(newRow, newCol, player.getColor(), affectedPlayers);
-                if(grid[newRow+1][newCol] instanceof Platform) {
-                    return new MoveResult(playerId, newRow, newCol, updatedPlatforms, affectedPlayers, true, false);
-                }
-                return new MoveResult(playerId, newRow, newCol, updatedPlatforms, affectedPlayers, true, true);
+                return moveDownPlatform(playerId, newRow, newCol, updatedPlatforms, affectedPlayers);
             } finally {
                 releaseLock(playerId);
                 getGridLock(playerId).notifyAll();
             }
         }
+    }
+
+    private MoveResult moveDownPlatform(UUID playerId, int currentRow, int currentCol, List<PlatformUpdate> affectedPlatforms, List<PlayerUpdate> affectedPlayers){
+        if(grid[currentRow+1][currentCol] instanceof TpPlataform) {
+            TpPlataform tp = (TpPlataform) grid[currentRow+1][currentCol];
+            Player player = players.get(playerId);
+
+            int newRow = tp.getNewRow();
+            int newCol = tp.getNewCol();
+
+            grid[currentRow][currentCol] = new Box(ColorStatus.WHITE);
+            player.setRow(newRow);
+            player.setCol(newCol);
+            grid[newRow][newCol] = player;
+
+            List<PlatformUpdate> updatedPlatforms = updateAdjacentPlatforms(newRow, newCol, player.getColor(), affectedPlayers);
+            return new MoveResult(playerId, newRow, newCol, updatedPlatforms, affectedPlayers, true, false);
+        }
+
+        if(grid[currentRow+1][currentCol] instanceof Platform) {
+            return new MoveResult(playerId, currentRow, currentCol, affectedPlatforms, affectedPlayers, false, false);
+        }
+        return new MoveResult(playerId, currentRow, currentCol, affectedPlatforms, affectedPlayers, false, true);
     }
 
 
@@ -288,4 +297,5 @@ public class Board {
         if (rowBelow >= this.grid.length) return null;
         return this.grid[rowBelow][player.getCol()];
     }
+
 }
