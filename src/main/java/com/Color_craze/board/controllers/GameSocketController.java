@@ -28,6 +28,7 @@ public class GameSocketController {
 
     @MessageMapping("/move.{gameId}")
     public void handlePlayerMove(@DestinationVariable String gameId, @Payload PlayerMoveMessage moveMessage) {
+        System.out.println("Received move from player " + moveMessage.getPlayerId() + " in game " + gameId + " to " + moveMessage.getDirection());
         List<MoveResult> results = boardService.movePlayer(gameId, moveMessage.getPlayerId(), moveMessage.getDirection());
 
         CompletableFuture.runAsync(() -> {
@@ -40,6 +41,7 @@ public class GameSocketController {
                     Thread.currentThread().interrupt();
                     break;
                 }
+                System.out.println("si salio el mensaje " + gameId);
                 messagingTemplate.convertAndSend("/topic/board." + gameId, result);
 
                 if (result.gravity()) {
