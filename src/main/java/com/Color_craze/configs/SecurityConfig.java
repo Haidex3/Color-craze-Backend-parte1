@@ -1,6 +1,7 @@
 package com.Color_craze.configs;
 
 import com.Color_craze.configs.filters.FirebaseTokenFilter;
+import com.Color_craze.configs.filters.LoggingContextFilter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -17,8 +18,8 @@ import java.util.List;
 @RequiredArgsConstructor
 public class SecurityConfig {
 
-    // 🔥 Nuevo filtro que valida Firebase ID Token
     private final FirebaseTokenFilter firebaseTokenFilter;
+    private final LoggingContextFilter loggingContextFilter;
 
     @Bean
     SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
@@ -52,7 +53,11 @@ public class SecurityConfig {
                         ).permitAll()
                         .anyRequest().authenticated()
                 )
-                .addFilterBefore(firebaseTokenFilter, UsernamePasswordAuthenticationFilter.class)
+
+                .addFilterBefore(loggingContextFilter, UsernamePasswordAuthenticationFilter.class)
+
+                .addFilterAfter(firebaseTokenFilter, LoggingContextFilter.class)
+
                 .httpBasic(httpBasic -> {});
 
         return http.build();

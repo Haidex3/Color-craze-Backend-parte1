@@ -1,10 +1,10 @@
 package com.Color_craze.board.models;
 
-public class TpPlataform extends Box{
+public class TpPlatform extends Box{
 
     private int newCol, newRow;
 
-    public TpPlataform(int newRow, int newCol) {
+    public TpPlatform(int newRow, int newCol) {
         super(null);
         this.newCol = newCol;
         this.newRow = newRow; 
