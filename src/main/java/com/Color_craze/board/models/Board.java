@@ -55,10 +55,10 @@ public class Board {
         for (Position pos : platforms) {
             grid[pos.getRow()][pos.getCol()] = new Platform(ColorStatus.WHITE);
         }
+        grid[7][24] = new TpPlatform(2, 15);
+        grid[11][26] = new TpPlatform(6, 15);
+        grid[14][29] = new TpPlatform(10, 15);
 
-        grid[7][23] = new TpPlataform(2, 15);
-        grid[11][25] = new TpPlataform(6, 15);
-        grid[13][27] = new TpPlataform(10, 15);
     }
 
     private List<Position> generatePlatforms(int rows, int cols) {
@@ -70,7 +70,7 @@ public class Board {
 
             if (i >= 8 && i <= 22) platforms.add(new Position(3, i));
             if (i >= 6 && i < 24) platforms.add(new Position(7, i));
-            if (i >= 4 && i <= 26) platforms.add(new Position(11, i));
+            if (i >= 4 && i <= 25) platforms.add(new Position(11, i));
         }
 
         for (int i = 0; i < rows; i++) {
@@ -135,8 +135,8 @@ public class Board {
         }
 
         Box destination = grid[newRow][newCol];
-        if (destination instanceof Platform || destination instanceof Player) {
-            return moveDownPlatform(playerId, currentRow, currentCol, List.of(), List.of());
+        if (destination instanceof Platform || destination instanceof Player || destination instanceof TpPlatform) {
+            return moveDownPlatform(playerId, currentRow, currentCol, List.of(),List.of());
         }
 
         synchronized (gridLock) {
@@ -175,8 +175,8 @@ public class Board {
         }
 
         Box below = grid[currentRow + 1][currentCol];
-        if (below instanceof TpPlataform) {
-            TpPlataform tp = (TpPlataform) below;
+        if (below instanceof TpPlatform) {
+            TpPlatform tp = (TpPlatform) below;
             Player player = players.get(playerId);
 
             int newRow = tp.getNewRow();
