@@ -291,10 +291,6 @@ public class Board {
         lockQueue.remove(playerId);
     }
 
-    public Object getGridLock() {
-        return gridLock;
-    }
-
     public Box getRowDownPLayer(String playerId){
         UUID uuid = UUID.fromString(playerId);
         Player player = players.get(uuid);
