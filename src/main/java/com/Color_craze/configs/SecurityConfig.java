@@ -31,7 +31,8 @@ public class SecurityConfig {
 
                     config.setAllowedOrigins(List.of(
                             "http://localhost:5173",
-                            "https://proud-plant-0b52ed10f.3.azurestaticapps.net"
+                            "https://proud-plant-0b52ed10f.3.azurestaticapps.net",
+                            "https://black-glacier-051db390f.3.azurestaticapps.net"
                     ));
                     config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
                     config.setAllowedHeaders(List.of("*"));
