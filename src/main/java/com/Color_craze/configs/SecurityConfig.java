@@ -27,19 +27,14 @@ public class SecurityConfig {
         http
                 .csrf(csrf -> csrf.disable())
                 .cors(cors -> cors.configurationSource(request -> {
-                    CorsConfiguration config = new CorsConfiguration();
 
-                    config.setAllowedOrigins(List.of(
-                            "http://localhost:5173",
-                            "https://proud-plant-0b52ed10f.3.azurestaticapps.net",
-                            "https://black-glacier-051db390f.3.azurestaticapps.net"
-                    ));
-                    config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
-                    config.setAllowedHeaders(List.of("*"));
-                    config.setExposedHeaders(List.of("X-Correlation-ID"));
-                    config.setAllowCredentials(true);
-
-                    return config;
+                    var corsConfig = new org.springframework.web.cors.CorsConfiguration();
+                    corsConfig.setAllowedOrigins(java.util.List.of("http://localhost:5173", "https://proud-plant-0b52ed10f.3.azurestaticapps.net", "https://black-glacier-051db390f.3.azurestaticapps.net"));
+                    corsConfig.setAllowedMethods(java.util.List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+                    corsConfig.setAllowedHeaders(java.util.List.of("*"));
+                    corsConfig.setExposedHeaders(java.util.List.of("X-Correlation-ID"));
+                    corsConfig.setAllowCredentials(true);
+                    return corsConfig;
                 }))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(
