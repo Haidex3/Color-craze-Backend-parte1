@@ -19,16 +19,8 @@ public class WaitingRoomRestController {
 
     @PostMapping("/create/{playerId}")
     public ResponseEntity<WaitingRoomState> createRoom(@PathVariable String playerId) {
-        System.out.println("Creating room for player: " + playerId);
         WaitingRoom room = waitingRoomService.createRoom();
-        WaitingRoomState state = new WaitingRoomState(
-                room.getRoomId(),
-                room.getPlayers(),
-                room.getPlayerColors(),
-                room.isFull(),
-                room.getSeconds()   
-        );
-        state = waitingRoomService.joinRoom(room.getRoomId(), playerId);
+        WaitingRoomState state = waitingRoomService.joinRoom(room.getRoomId(), playerId);
         return ResponseEntity.ok(state);
     }
 

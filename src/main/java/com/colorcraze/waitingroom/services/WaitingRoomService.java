@@ -54,39 +54,66 @@ public class WaitingRoomService {
         return room;
     }
 
+    private final Map<String, ScheduledExecutorService> roomSchedulers = new ConcurrentHashMap<>();
+
     private void startCountdown(WaitingRoom room) {
         ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
-        scheduler.scheduleAtFixedRate(() -> {
-            synchronized (room) {
-                if (room.getSeconds() > 0) {
-                    room.setSeconds(room.getSeconds() - 1);
+        roomSchedulers.put(room.getRoomId(), scheduler);
 
-                    WaitingRoomState state = new WaitingRoomState(
-                            room.getRoomId(),
-                            room.getPlayers(),
-                            room.getPlayerColors(),
-                            room.isFull(),
-                            room.getSeconds()
-                    );
-                    messagingTemplate.convertAndSend("/topic/waiting-room/" + room.getRoomId(), state);
+        Runnable task = createCountdownTask(room, scheduler);
+        scheduler.scheduleAtFixedRate(task, 0, 1, TimeUnit.SECONDS);
+    }
 
-                } else {
-                    scheduler.shutdown();
+    private Runnable createCountdownTask(WaitingRoom room, ScheduledExecutorService scheduler) {
+        return new Runnable() {
+            private int count = room.getSeconds();
+
+            @Override
+            public void run() {
+                synchronized (room.getLock()) {
                     try {
-                        Map<String, ColorStatus> playerColors = room.getPlayerColors();
-                        if (!playerColors.isEmpty()) {
-                            Board board = boardService.createBoardWithPlayers(room.getRoomId(), playerColors);
-
-                            messagingTemplate.convertAndSend("/topic/waiting-room/" + room.getRoomId() + "/start", board);
+                        if (count > 0) {
+                            updateCountdown(room);
+                            count--;
+                        } else {
+                            startGameIfPlayersExist(room);
+                            cleanupRoom(room, scheduler);
                         }
                     } catch (Exception e) {
                         e.printStackTrace();
+                        cleanupRoom(room, scheduler);
                     }
-
-                    rooms.remove(room.getRoomId());
                 }
             }
-        }, 0, 1, TimeUnit.SECONDS);
+        };
+    }
+
+    private void updateCountdown(WaitingRoom room) {
+        room.setSeconds(room.getSeconds());
+        WaitingRoomState state = new WaitingRoomState(
+                room.getRoomId(),
+                room.getPlayers(),
+                room.getPlayerColors(),
+                room.isFull(),
+                room.getSeconds()
+        );
+        messagingTemplate.convertAndSend("/topic/waiting-room/" + room.getRoomId(), state);
+    }
+
+    private void startGameIfPlayersExist(WaitingRoom room) {
+        Map<String, ColorStatus> playerColors = room.getPlayerColors();
+        if (!playerColors.isEmpty()) {
+            Board board = boardService.createBoardWithPlayers(room.getRoomId(), playerColors);
+            messagingTemplate.convertAndSend("/topic/waiting-room/" + room.getRoomId() + "/start", board);
+        }
+    }
+
+    private void cleanupRoom(WaitingRoom room, ScheduledExecutorService scheduler) {
+        rooms.remove(room.getRoomId());
+        if (scheduler != null && !scheduler.isShutdown()) {
+            scheduler.shutdown();
+        }
+        roomSchedulers.remove(room.getRoomId());
     }
 
     public Optional<WaitingRoom> getRoom(String roomId) {

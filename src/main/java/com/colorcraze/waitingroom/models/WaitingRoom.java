@@ -15,6 +15,7 @@ public class WaitingRoom {
     private final Map<String, ColorStatus> playerColors;
     private final Set<String> players;
     private final int maxPlayers;
+    private final Object lock = new Object(); 
     
     private int seconds;
     private ScheduledExecutorService scheduler;

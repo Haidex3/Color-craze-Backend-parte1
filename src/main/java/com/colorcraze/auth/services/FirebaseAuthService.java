@@ -47,7 +47,7 @@ public class FirebaseAuthService {
             String email = decoded.getEmail();
             String name = decoded.getName();
 
-            Optional<AuthUser> maybe = userRepository.findByUid(uid);
+            Optional<AuthUser> maybe = userRepository.findById(uid);
 
             AuthUser user;
             if (maybe.isPresent()) {
@@ -59,7 +59,7 @@ public class FirebaseAuthService {
                 user = new AuthUser(uid, email, name, role, null);
             }
 
-            String refreshToken = UUID.randomUUID().toString();
+            String refreshToken = "";
             String jwt = jwtUtil.generateToken(uid, user.getRole());
 
             user.setRefreshToken(refreshToken);

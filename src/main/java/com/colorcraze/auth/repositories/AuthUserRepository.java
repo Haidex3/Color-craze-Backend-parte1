@@ -11,7 +11,7 @@ import java.util.Optional;
  * Provides lookup operations for authentication and user management.
  */
 public interface AuthUserRepository extends MongoRepository<AuthUser, String> {
-    Optional<AuthUser> findByUid(String uid);
+    Optional<AuthUser> findById(String uid);
     Optional<AuthUser> findByEmail(String email);
     Optional<AuthUser> findByRefreshToken(String refreshToken);
 }
