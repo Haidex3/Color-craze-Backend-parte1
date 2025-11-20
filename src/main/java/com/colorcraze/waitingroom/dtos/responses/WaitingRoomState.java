@@ -8,6 +8,12 @@ import java.util.Set;
 
 import com.colorcraze.utils.enums.ColorStatus;
 
+/**
+ * Data Transfer Object representing the current state of a waiting room.
+ * 
+ * Sent to clients to inform about players in the room, their selected colors,
+ * whether the room is full, and (optionally) the remaining time.
+ */
 @Data
 @AllArgsConstructor
 public class WaitingRoomState {
@@ -15,5 +21,5 @@ public class WaitingRoomState {
     private Set<String> players;
     private Map<String, ColorStatus> playerColors;
     private boolean isFull;
-    private int seconds; // tiempo restante en segundos --- IGNORE ---
+    private int seconds;
 }

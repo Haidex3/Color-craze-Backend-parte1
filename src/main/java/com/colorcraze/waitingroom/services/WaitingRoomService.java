@@ -17,10 +17,16 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
+/**
+ * Service responsible for managing waiting rooms.
+ * It handles creation, joining, leaving, color selection, countdown,
+ * and starting the game when countdown ends.
+ */
 @Service
 public class WaitingRoomService {
 
     private final Map<String, WaitingRoom> rooms = new ConcurrentHashMap<>();
+    private final Map<String, ScheduledExecutorService> roomSchedulers = new ConcurrentHashMap<>();
     private final SimpMessagingTemplate messagingTemplate;
     private final BoardService boardService;
 
@@ -29,11 +35,22 @@ public class WaitingRoomService {
     private static final int DEFAULT_WAIT_SECONDS = 10;
     private final SecureRandom random = new SecureRandom();
 
+    /**
+     * Constructor for WaitingRoomService.
+     *
+     * @param messagingTemplate the messaging template for sending WebSocket messages
+     * @param boardService      the board service for creating game boards
+     */
     public WaitingRoomService(SimpMessagingTemplate messagingTemplate, BoardService boardService) {
         this.messagingTemplate = messagingTemplate;
         this.boardService = boardService;
     }
 
+    /**
+     * Generates a random room ID of fixed length.
+     *
+     * @return a new unique room ID
+     */
     private String generateRoomId() {
         StringBuilder sb = new StringBuilder(ROOM_ID_LENGTH);
         for (int i = 0; i < ROOM_ID_LENGTH; i++) {
@@ -42,6 +59,11 @@ public class WaitingRoomService {
         return sb.toString();
     }
 
+    /**
+     * Creates a new waiting room and starts its countdown.
+     *
+     * @return the newly created waiting room
+     */
     public WaitingRoom createRoom() {
         String roomId;
         do {
@@ -54,8 +76,12 @@ public class WaitingRoomService {
         return room;
     }
 
-    private final Map<String, ScheduledExecutorService> roomSchedulers = new ConcurrentHashMap<>();
-
+    /**
+     * Starts the countdown for a waiting room.
+     * Sends periodic updates to subscribed clients via WebSocket.
+     *
+     * @param room the waiting room to start the countdown for
+     */
     private void startCountdown(WaitingRoom room) {
         ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
         roomSchedulers.put(room.getRoomId(), scheduler);
@@ -64,32 +90,39 @@ public class WaitingRoomService {
         scheduler.scheduleAtFixedRate(task, 0, 1, TimeUnit.SECONDS);
     }
 
+    /**
+     * Creates a countdown task for the waiting room.
+     *
+     * @param room      the waiting room
+     * @param scheduler the scheduler managing this task
+     * @return a runnable countdown task
+     */
     private Runnable createCountdownTask(WaitingRoom room, ScheduledExecutorService scheduler) {
-        return new Runnable() {
-            private int count = room.getSeconds();
-
-            @Override
-            public void run() {
-                synchronized (room.getLock()) {
-                    try {
-                        if (count > 0) {
-                            updateCountdown(room);
-                            count--;
-                        } else {
-                            startGameIfPlayersExist(room);
-                            cleanupRoom(room, scheduler);
-                        }
-                    } catch (Exception e) {
-                        e.printStackTrace();
+        return () -> {
+            synchronized (room.getLock()) {
+                try {
+                    int seconds = room.getSeconds();
+                    if (seconds > 0) {
+                        room.setSeconds(seconds - 1);
+                        sendRoomState(room);
+                    } else {
+                        startGameIfPlayersExist(room);
                         cleanupRoom(room, scheduler);
                     }
+                } catch (Exception e) {
+                    e.printStackTrace();
+                    cleanupRoom(room, scheduler);
                 }
             }
         };
     }
 
-    private void updateCountdown(WaitingRoom room) {
-        room.setSeconds(room.getSeconds());
+    /**
+     * Sends the current state of the waiting room to subscribed clients.
+     *
+     * @param room the waiting room
+     */
+    private void sendRoomState(WaitingRoom room) {
         WaitingRoomState state = new WaitingRoomState(
                 room.getRoomId(),
                 room.getPlayers(),
@@ -100,6 +133,11 @@ public class WaitingRoomService {
         messagingTemplate.convertAndSend("/topic/waiting-room/" + room.getRoomId(), state);
     }
 
+    /**
+     * Starts the game if the waiting room has players.
+     *
+     * @param room the waiting room
+     */
     private void startGameIfPlayersExist(WaitingRoom room) {
         Map<String, ColorStatus> playerColors = room.getPlayerColors();
         if (!playerColors.isEmpty()) {
@@ -108,6 +146,12 @@ public class WaitingRoomService {
         }
     }
 
+    /**
+     * Cleans up the waiting room after countdown ends or on error.
+     *
+     * @param room      the waiting room
+     * @param scheduler the scheduler to shut down
+     */
     private void cleanupRoom(WaitingRoom room, ScheduledExecutorService scheduler) {
         rooms.remove(room.getRoomId());
         if (scheduler != null && !scheduler.isShutdown()) {
@@ -116,32 +160,68 @@ public class WaitingRoomService {
         roomSchedulers.remove(room.getRoomId());
     }
 
+    /**
+     * Retrieves a waiting room by its ID.
+     *
+     * @param roomId the room ID
+     * @return an Optional containing the waiting room if it exists
+     */
     public Optional<WaitingRoom> getRoom(String roomId) {
         return Optional.ofNullable(rooms.get(roomId));
     }
 
+    /**
+     * Adds a player to a waiting room.
+     *
+     * @param roomId   the room ID
+     * @param playerId the player ID
+     * @return the updated waiting room state, or null if the room does not exist
+     */
     public WaitingRoomState joinRoom(String roomId, String playerId) {
         WaitingRoom room = rooms.get(roomId);
         if (room == null) return null;
         return room.addPlayer(playerId);
     }
 
+    /**
+     * Removes a player from a waiting room.
+     *
+     * @param roomId   the room ID
+     * @param playerId the player ID
+     * @return true if the player was removed, false otherwise
+     */
     public boolean leaveRoom(String roomId, String playerId) {
         WaitingRoom room = rooms.get(roomId);
         if (room == null) return false;
         boolean removed = room.removePlayer(playerId);
         if (room.getPlayers().isEmpty()) {
             rooms.remove(roomId);
+            ScheduledExecutorService scheduler = roomSchedulers.remove(roomId);
+            if (scheduler != null && !scheduler.isShutdown()) scheduler.shutdown();
         }
         return removed;
     }
 
+    /**
+     * Allows a player to select a color in the waiting room.
+     *
+     * @param roomId   the room ID
+     * @param playerId the player ID
+     * @param color    the color to select
+     * @return true if selection was successful, false otherwise
+     */
     public boolean selectColor(String roomId, String playerId, ColorStatus color) {
         WaitingRoom room = rooms.get(roomId);
         if (room == null) return false;
         return room.selectColor(playerId, color);
     }
 
+    /**
+     * Retrieves the current state of a waiting room.
+     *
+     * @param roomId the room ID
+     * @return the waiting room state, or null if the room does not exist
+     */
     public WaitingRoomState getRoomState(String roomId) {
         WaitingRoom room = rooms.get(roomId);
         if (room == null) return null;
@@ -154,8 +234,15 @@ public class WaitingRoomService {
         );
     }
 
+    /**
+     * Removes a waiting room immediately.
+     *
+     * @param roomId the room ID
+     */
     public void removeRoom(String roomId) {
         rooms.remove(roomId);
+        ScheduledExecutorService scheduler = roomSchedulers.remove(roomId);
+        if (scheduler != null && !scheduler.isShutdown()) scheduler.shutdown();
     }
 
 }
