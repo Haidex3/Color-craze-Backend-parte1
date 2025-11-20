@@ -11,7 +11,11 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 import com.colorcraze.configs.filters.FirebaseTokenFilter;
 import com.colorcraze.configs.filters.LoggingContextFilter;
 
-
+/**
+ * Security configuration for the application.
+ * Configures CORS, CSRF, endpoint authorization, and the security filter chain.
+ * Integrates Firebase token authentication and logging correlation filter.
+ */
 @Configuration
 @EnableWebSecurity
 @RequiredArgsConstructor
@@ -20,6 +24,16 @@ public class SecurityConfig {
     private final FirebaseTokenFilter firebaseTokenFilter;
     private final LoggingContextFilter loggingContextFilter;
 
+    /**
+     * Configures the Spring Security filter chain.
+     * Disables CSRF, sets up CORS for allowed origins, exposes X-Correlation-ID,
+     * and defines which endpoints are public and which require authentication.
+     * Adds the logging context filter and Firebase token filter in the correct order.
+     *
+     * @param http the {@link HttpSecurity} instance
+     * @return the configured {@link SecurityFilterChain}
+     * @throws Exception if an error occurs during configuration
+     */
     @Bean
     SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
 

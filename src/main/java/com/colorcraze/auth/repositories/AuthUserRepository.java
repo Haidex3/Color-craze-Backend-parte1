@@ -6,6 +6,10 @@ import com.colorcraze.auth.models.AuthUser;
 
 import java.util.Optional;
 
+/**
+ * Repository interface for accessing and managing AuthUser entities in MongoDB.
+ * Provides lookup operations for authentication and user management.
+ */
 public interface AuthUserRepository extends MongoRepository<AuthUser, String> {
     Optional<AuthUser> findByUid(String uid);
     Optional<AuthUser> findByEmail(String email);

@@ -11,12 +11,27 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
+/**
+ * Servlet filter that manages a correlation ID for each HTTP request.
+ * The correlation ID is added to the MDC for logging and returned in the response header.
+ * Certain WebSocket-related paths are excluded from filtering.
+ */
 @Component
 public class LoggingContextFilter extends OncePerRequestFilter {
 
     private static final String CORRELATION_ID = "correlationId";
     private static final String HEADER_NAME = "X-Correlation-ID";
 
+    /**
+     * Filters incoming HTTP requests to set a correlation ID in MDC and response headers.
+     * Generates a new UUID if the header is missing or blank.
+     *
+     * @param request the HTTP request
+     * @param response the HTTP response
+     * @param filterChain the filter chain
+     * @throws ServletException if a servlet error occurs
+     * @throws IOException if an I/O error occurs
+     */
     @Override
     protected void doFilterInternal(
             @NonNull HttpServletRequest request,
@@ -29,7 +44,6 @@ public class LoggingContextFilter extends OncePerRequestFilter {
         }
 
         MDC.put(CORRELATION_ID, id);
-
         response.setHeader(HEADER_NAME, id);
 
         try {
@@ -39,6 +53,12 @@ public class LoggingContextFilter extends OncePerRequestFilter {
         }
     }
 
+    /**
+     * Determines whether the filter should not be applied for specific WebSocket-related paths.
+     *
+     * @param request the HTTP request
+     * @return true if the request should be excluded from filtering; false otherwise
+     */
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) throws ServletException {
         String path = request.getRequestURI();

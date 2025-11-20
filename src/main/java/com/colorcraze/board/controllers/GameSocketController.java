@@ -20,6 +20,10 @@ import com.colorcraze.utils.enums.PlayerMove;
 
 import lombok.RequiredArgsConstructor;
 
+/**
+ * Controller responsible for handling WebSocket messages for game moves.
+ * Receives player move messages and broadcasts board updates to clients.
+ */
 @Controller
 @RequiredArgsConstructor
 public class GameSocketController {
@@ -27,6 +31,13 @@ public class GameSocketController {
     private final BoardService boardService;
     private final SimpMessagingTemplate messagingTemplate;
 
+    /**
+     * Handles a player move received via WebSocket.
+     * Processes the move, applies gravity effects if necessary, and broadcasts updates.
+     *
+     * @param gameId the ID of the game
+     * @param moveMessage the message containing player ID and move direction
+     */
     @MessageMapping("/move.{gameId}")
     public void handlePlayerMove(@DestinationVariable String gameId, @Payload PlayerMoveMessage moveMessage) {
         List<MoveResult> results = boardService.movePlayer(gameId, moveMessage.getPlayerId(), moveMessage.getDirection());
@@ -50,6 +61,12 @@ public class GameSocketController {
         });
     }
 
+    /**
+     * Applies gravity logic for a player, updating the board state and sending final results.
+     *
+     * @param gameId the ID of the game
+     * @param playerId the ID of the player affected by gravity
+     */
     private void applyGravity(String gameId, String playerId) {
         List<PlatformUpdate> totalPlatformUpdates = new ArrayList<>();
         List<PlayerUpdate> totalPlayerUpdates = new ArrayList<>();
@@ -71,10 +88,21 @@ public class GameSocketController {
         sendFinalResult(gameId, lastStep, totalPlatformUpdates, totalPlayerUpdates);
     }
 
+    /**
+     * Determines if the player should continue falling based on the last move result.
+     *
+     * @param lastStep the previous move result
+     * @return true if the player should keep falling, false otherwise
+     */
     private boolean shouldContinueFalling(MoveResult lastStep) {
         return lastStep == null || lastStep.gravity();
     }
 
+    /**
+     * Sleeps the current thread safely for a short interval to pace gravity steps.
+     *
+     * @return true if sleep completed successfully, false if interrupted
+     */
     private boolean sleepSafely() {
         try {
             Thread.sleep(100);
@@ -85,6 +113,14 @@ public class GameSocketController {
         }
     }
 
+    /**
+     * Processes gravity move results, collecting platform and player updates.
+     *
+     * @param gravityResults the list of gravity move results
+     * @param platformUpdates accumulator for platform updates
+     * @param playerUpdates accumulator for player updates
+     * @return true if the player should continue falling, false otherwise
+     */
     private boolean processGravityResults(List<MoveResult> gravityResults, 
                                         List<PlatformUpdate> platformUpdates,
                                         List<PlayerUpdate> playerUpdates) {
@@ -105,6 +141,12 @@ public class GameSocketController {
         return true;
     }
 
+    /**
+     * Retrieves the last step from a list of move results.
+     *
+     * @param gravityResults the list of gravity move results
+     * @return the last non-null move result, or null if none exist
+     */
     private MoveResult getLastStepFromResults(List<MoveResult> gravityResults) {
         return gravityResults.stream()
                 .filter(Objects::nonNull)
@@ -112,6 +154,14 @@ public class GameSocketController {
                 .orElse(null);
     }
 
+    /**
+    * Sends the final gravity result to all subscribed clients for the game.
+    *
+    * @param gameId the ID of the game
+    * @param lastStep the last move result after gravity
+    * @param platformUpdates the accumulated platform updates
+    * @param playerUpdates the accumulated player updates
+    */
     private void sendFinalResult(String gameId, MoveResult lastStep, 
                             List<PlatformUpdate> platformUpdates,
                             List<PlayerUpdate> playerUpdates) {

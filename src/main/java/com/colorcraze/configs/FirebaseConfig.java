@@ -9,9 +9,20 @@ import jakarta.annotation.PostConstruct;
 
 import java.io.InputStream;
 
+/**
+ * Configuration class responsible for initializing Firebase during application startup.
+ * Loads service account credentials and initializes the FirebaseApp instance.
+ * Throws {@link FirebaseInitializationException} if initialization fails or the credentials file is missing.
+ */
 @Configuration
 public class FirebaseConfig {
 
+    /**
+     * Initializes Firebase using the service account JSON file.
+     * Called automatically after the Spring context is constructed.
+     *
+     * @throws FirebaseInitializationException if the service account file is missing or initialization fails
+     */
     @PostConstruct
     public void initializeFirebase() {
         try {

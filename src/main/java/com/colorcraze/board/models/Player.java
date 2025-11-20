@@ -7,6 +7,10 @@ import com.colorcraze.utils.enums.ColorStatus;
 import lombok.Getter;
 import lombok.Setter;
 
+/**
+ * Represents a player on the game board.
+ * Inherits from {@link Box} and contains player-specific attributes such as ID, position, score, and orientation.
+ */
 @Getter
 @Setter
 public class Player extends Box{
@@ -16,6 +20,13 @@ public class Player extends Box{
     private int score;
     private boolean isUp;
 
+    /**
+     * Constructs a new Player with the specified ID and color.
+     * Initializes the starting position based on the player's color.
+     *
+     * @param id the unique identifier of the player
+     * @param color the color of the player
+     */
     public Player(UUID id, ColorStatus color) {
         super(color);
         this.color = color;
