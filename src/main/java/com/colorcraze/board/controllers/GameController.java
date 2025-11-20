@@ -19,9 +19,6 @@ public class GameController {
     private final BoardService boardService;
     private final WaitingRoomService waitingRoomService;
 
-    /**
-     * Crear partida a partir de una sala de espera
-     */
     @PostMapping("/create-from-room/{roomId}")
     public ResponseEntity<Map<String, Object>> createGameFromRoom(@PathVariable String roomId) {
         WaitingRoomState roomState = waitingRoomService.getRoomState(roomId);
@@ -37,18 +34,16 @@ public class GameController {
         ));
     }
 
-    /**
-     * Consultar el estado completo del tablero (mapa) de un juego.
-     * Devuelve todo el Board para inicializar el mapa en el cliente.
-     */
     @GetMapping("/{gameId}")
-    public ResponseEntity<?> getBoardState(@PathVariable String gameId) {
+    public ResponseEntity<Object> getBoardState(@PathVariable String gameId) {
         Board board = boardService.getBoard(gameId);
 
         if (board == null) {
-            return ResponseEntity.status(404).body(Map.of("error", "Juego no encontrado"));
+            return ResponseEntity.status(404)
+                    .body(Map.of("error", "Juego no encontrado"));
         }
 
         return ResponseEntity.ok(board);
     }
+
 }

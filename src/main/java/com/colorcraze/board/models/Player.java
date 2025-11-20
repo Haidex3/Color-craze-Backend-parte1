@@ -11,7 +11,8 @@ import lombok.Setter;
 @Setter
 public class Player extends Box{
     private UUID id;
-    private int col, Row;
+    private int col;
+    private int row;
     private int score;
     private boolean isUp;
 
@@ -22,15 +23,15 @@ public class Player extends Box{
         this.score = 0;
         this.isUp = false;
         switch (color) {
-        case RED -> {Row = 13;
+        case RED -> {row = 13;
             col = 29;}
-        case YELLOW -> {Row = 13;
+        case YELLOW -> {row = 13;
             col = 1;}
-        case PURPLE -> {Row = 6;
+        case PURPLE -> {row = 6;
             col = 8;}
-        case GREEN -> {Row = 6;
+        case GREEN -> {row = 6;
             col = 22;}
-        default -> {Row = -1;
+        default -> {row = -1;
             col = -1;}
     }}
 

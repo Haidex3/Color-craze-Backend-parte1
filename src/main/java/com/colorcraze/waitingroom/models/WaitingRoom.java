@@ -81,9 +81,7 @@ public class WaitingRoom {
             synchronized (this) {
                 if (seconds > 0) {
                     seconds--;
-                    System.out.println("Sala " + roomId + " tiempo restante: " + seconds + "s");
                 } else {
-                    System.out.println("Sala " + roomId + " terminó el tiempo de espera");
                     stopCountdown();
                 }
             }

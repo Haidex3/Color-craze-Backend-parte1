@@ -6,10 +6,6 @@ import org.springframework.context.annotation.Configuration;
 import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.info.Info;
 
-/**
- * Configuración de OpenAPI/Swagger para la documentación de la API de Color Craze.
- * Compatible con MongoDB como base de datos.
- */
 @Configuration
 public class OpenApiConfig {
 

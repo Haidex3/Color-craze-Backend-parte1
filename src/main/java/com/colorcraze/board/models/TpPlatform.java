@@ -2,7 +2,8 @@ package com.colorcraze.board.models;
 
 public class TpPlatform extends Box{
 
-    private int newCol, newRow;
+    private int newCol;
+    private int newRow;
 
     public TpPlatform(int newRow, int newCol) {
         super(null);

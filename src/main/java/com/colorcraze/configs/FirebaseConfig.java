@@ -1,5 +1,6 @@
 package com.colorcraze.configs;
 
+import com.colorcraze.configs.exceptions.FirebaseInitializationException;
 import com.google.auth.oauth2.GoogleCredentials;
 import com.google.firebase.FirebaseApp;
 import com.google.firebase.FirebaseOptions;
@@ -18,7 +19,9 @@ public class FirebaseConfig {
                     getClass().getResourceAsStream("/firebase/firebase-service-account.json");
 
             if (serviceAccount == null) {
-                throw new IllegalStateException("No se encontró el archivo firebase-service-account.json");
+                throw new FirebaseInitializationException(
+                        "No se encontró el archivo firebase-service-account.json", null
+                );
             }
 
             FirebaseOptions options = FirebaseOptions.builder()
@@ -27,10 +30,8 @@ public class FirebaseConfig {
 
             FirebaseApp.initializeApp(options);
 
-            System.out.println("🔥 Firebase Admin inicializado correctamente!");
-
         } catch (Exception e) {
-            throw new RuntimeException("Error inicializando Firebase", e);
+            throw new FirebaseInitializationException("Error inicializando Firebase", e);
         }
     }
 }

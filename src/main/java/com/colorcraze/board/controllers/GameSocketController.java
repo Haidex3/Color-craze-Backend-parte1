@@ -2,6 +2,7 @@ package com.colorcraze.board.controllers;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 
 import org.springframework.messaging.handler.annotation.DestinationVariable;
@@ -28,7 +29,6 @@ public class GameSocketController {
 
     @MessageMapping("/move.{gameId}")
     public void handlePlayerMove(@DestinationVariable String gameId, @Payload PlayerMoveMessage moveMessage) {
-        System.out.println("Received move from player " + moveMessage.getPlayerId() + " in game " + gameId + " to " + moveMessage.getDirection());
         List<MoveResult> results = boardService.movePlayer(gameId, moveMessage.getPlayerId(), moveMessage.getDirection());
 
         CompletableFuture.runAsync(() -> {
@@ -41,7 +41,6 @@ public class GameSocketController {
                     Thread.currentThread().interrupt();
                     break;
                 }
-                System.out.println("si salio el mensaje " + gameId);
                 messagingTemplate.convertAndSend("/topic/board." + gameId, result);
 
                 if (result.gravity()) {
@@ -51,50 +50,81 @@ public class GameSocketController {
         });
     }
 
-    /**
-     * Aplica gravedad acumulada y envía un único resultado final.
-     */
     private void applyGravity(String gameId, String playerId) {
-        boolean continueFalling = true;
         List<PlatformUpdate> totalPlatformUpdates = new ArrayList<>();
         List<PlayerUpdate> totalPlayerUpdates = new ArrayList<>();
         MoveResult lastStep = null;
 
-        while (continueFalling) {
-            try {
-                Thread.sleep(100);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                break;
+        while (shouldContinueFalling(lastStep)) {
+            if (!sleepSafely()) {
+                return;
             }
 
             List<MoveResult> gravityResults = boardService.movePlayer(gameId, playerId, PlayerMove.DOWN);
-            if (gravityResults == null || gravityResults.isEmpty()) break;
+            if (!processGravityResults(gravityResults, totalPlatformUpdates, totalPlayerUpdates)) {
+                break;
+            }
+            
+            lastStep = getLastStepFromResults(gravityResults);
+        }
 
-            for (MoveResult gravityStep : gravityResults) {
-                if (gravityStep == null) continue;
-                totalPlatformUpdates.addAll(gravityStep.platforms());
-                totalPlayerUpdates.addAll(gravityStep.affectedPlayers());
-                lastStep = gravityStep;
+        sendFinalResult(gameId, lastStep, totalPlatformUpdates, totalPlayerUpdates);
+    }
 
+    private boolean shouldContinueFalling(MoveResult lastStep) {
+        return lastStep == null || lastStep.gravity();
+    }
+
+    private boolean sleepSafely() {
+        try {
+            Thread.sleep(100);
+            return true;
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return false;
+        }
+    }
+
+    private boolean processGravityResults(List<MoveResult> gravityResults, 
+                                        List<PlatformUpdate> platformUpdates,
+                                        List<PlayerUpdate> playerUpdates) {
+        if (gravityResults == null || gravityResults.isEmpty()) {
+            return false;
+        }
+
+        for (MoveResult gravityStep : gravityResults) {
+            if (gravityStep != null) {
+                platformUpdates.addAll(gravityStep.platforms());
+                playerUpdates.addAll(gravityStep.affectedPlayers());
+                
                 if (!gravityStep.gravity()) {
-                    continueFalling = false;
-                    break;
+                    return false;
                 }
             }
         }
+        return true;
+    }
 
+    private MoveResult getLastStepFromResults(List<MoveResult> gravityResults) {
+        return gravityResults.stream()
+                .filter(Objects::nonNull)
+                .reduce((first, second) -> second)
+                .orElse(null);
+    }
+
+    private void sendFinalResult(String gameId, MoveResult lastStep, 
+                            List<PlatformUpdate> platformUpdates,
+                            List<PlayerUpdate> playerUpdates) {
         if (lastStep != null) {
             MoveResult finalResult = new MoveResult(
                 lastStep.playerId(),
                 lastStep.newRow(),
                 lastStep.newCol(),
-                totalPlatformUpdates,
-                totalPlayerUpdates,
+                platformUpdates,
+                playerUpdates,
                 lastStep.success(),
-                false 
+                false
             );
-
             messagingTemplate.convertAndSend("/topic/board." + gameId, finalResult);
         }
     }

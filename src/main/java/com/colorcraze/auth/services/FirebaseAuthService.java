@@ -4,10 +4,12 @@ package com.colorcraze.auth.services;
 import com.colorcraze.auth.dtos.FirebaseLoginRequest;
 import com.colorcraze.auth.dtos.LoginResponse;
 import com.colorcraze.auth.dtos.UserData;
+import com.colorcraze.auth.exceptions.FirebaseLoginException;
 import com.colorcraze.auth.models.AuthUser;
 import com.colorcraze.auth.repositories.AuthUserRepository;
 import com.colorcraze.utils.JwtUtil;
 import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.auth.FirebaseAuthException;
 import com.google.firebase.auth.FirebaseToken;
 import org.springframework.stereotype.Service;
 
@@ -25,55 +27,54 @@ public class FirebaseAuthService {
         this.userRepository = userRepository;
     }
 
-    /**
-     * Verifica idToken de Firebase, crea/actualiza usuario local y devuelve LoginResponse
-     */
-    public LoginResponse loginWithFirebase(FirebaseLoginRequest request) throws Exception {
-        FirebaseToken decoded = FirebaseAuth.getInstance().verifyIdToken(request.getIdToken());
+    public LoginResponse loginWithFirebase(FirebaseLoginRequest request) {
+        try {
+            FirebaseToken decoded = FirebaseAuth.getInstance().verifyIdToken(request.getIdToken());
 
-        String uid = decoded.getUid();
-        String email = decoded.getEmail();
-        String name = decoded.getName();
+            String uid = decoded.getUid();
+            String email = decoded.getEmail();
+            String name = decoded.getName();
 
-        // buscar usuario local por uid
-        Optional<AuthUser> maybe = userRepository.findByUid(uid);
+            Optional<AuthUser> maybe = userRepository.findByUid(uid);
 
-        AuthUser user;
-        if (maybe.isPresent()) {
-            user = maybe.get();
-            // actualizar datos básicos si cambiaron
-            user.setEmail(email);
-            user.setDisplayName(name);
-        } else {
-            // crear
-            String role = "USER"; // rol por defecto, puedes personalizar
-            user = new AuthUser(uid, email, name, role, null);
+            AuthUser user;
+            if (maybe.isPresent()) {
+                user = maybe.get();
+                user.setEmail(email);
+                user.setDisplayName(name);
+            } else {
+                String role = "USER";
+                user = new AuthUser(uid, email, name, role, null);
+            }
+
+            String refreshToken = UUID.randomUUID().toString();
+            String jwt = jwtUtil.generateToken(uid, user.getRole());
+
+            user.setRefreshToken(refreshToken);
+            userRepository.save(user);
+
+            UserData ud = new UserData(
+                    user.getId(),
+                    user.getUid(),
+                    user.getEmail(),
+                    user.getDisplayName(),
+                    user.getRole()
+            );
+
+            return new LoginResponse(jwt, refreshToken, ud);
+
+        } catch (FirebaseAuthException e) {
+            throw new FirebaseLoginException("Error validating Firebase ID token", e);
         }
-
-        // generar refresh token (uuid) y jwt interno
-        String refreshToken = UUID.randomUUID().toString();
-        String jwt = jwtUtil.generateToken(uid, user.getRole());
-
-        user.setRefreshToken(refreshToken);
-        userRepository.save(user);
-
-        UserData ud = new UserData(user.getId(), user.getUid(), user.getEmail(), user.getDisplayName(), user.getRole());
-
-        return new LoginResponse(jwt, refreshToken, ud);
     }
 
-    /**
-     * Refresh token flow: recibe refresh token y devuelve nuevo JWT + refresh token
-     */
     public LoginResponse refresh(String refreshToken) {
-        // buscar usuario por refresh token
         Optional<AuthUser> maybe = userRepository.findByRefreshToken(refreshToken);
         if (maybe.isEmpty()) {
             throw new IllegalArgumentException("Invalid refresh token");
         }
         AuthUser user = maybe.get();
 
-        // crear nuevos tokens
         String newRefresh = UUID.randomUUID().toString();
         String newJwt = jwtUtil.generateToken(user.getUid(), user.getRole());
 
@@ -85,3 +86,4 @@ public class FirebaseAuthService {
         return new LoginResponse(newJwt, newRefresh, ud);
     }
 }
+

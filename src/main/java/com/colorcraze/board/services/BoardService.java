@@ -24,10 +24,6 @@ public class BoardService {
 
     private final Map<String, Board> boards = new ConcurrentHashMap<>();
 
-    /**
-     * Crea un nuevo tablero con los jugadores dados.
-     * Si el gameId ya existe, lanza excepción.
-     */
     public Board createBoardWithPlayers(String gameId, Map<String, ColorStatus> playerColors) {
         if (boards.containsKey(gameId)) {
             throw new IllegalStateException("El tablero con id " + gameId + " ya existe");
@@ -45,10 +41,6 @@ public class BoardService {
         return newBoard;
     }
 
-    /**
-     * Obtiene un tablero existente.
-     * Si no existe, lanza excepción.
-     */
     public Board getBoard(String gameId) {
         Board board = boards.get(gameId);
         if (board == null) {
@@ -73,7 +65,7 @@ public class BoardService {
 
         if (playerMove == PlayerMove.UP) {
             if (board.isPlayerUp(uuid) || !(board.getRowDownPLayer(playerId) instanceof Platform)) {
-                return null;
+                return List.of();
             }
 
             board.setPlayerIsUp(uuid, true);
@@ -115,10 +107,6 @@ public class BoardService {
         return results;
     }
 
-
-    /**
-     * Agrega un nuevo jugador a un tablero existente.
-     */
     public Player addPlayerToBoard(String gameId, ColorStatus color) {
         Board board = getBoard(gameId);
         Player newPlayer = new Player(UUID.randomUUID(), color);

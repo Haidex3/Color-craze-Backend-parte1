@@ -130,7 +130,7 @@ public class Board {
             case DOWN  -> newRow++;
         }
 
-        if (newRow < 0 || newRow >= ROWS || newCol < 0 || newCol >= COLS || (!(playerMove==PlayerMove.UP) && player.isUp())) {
+        if (newRow < 0 || newRow >= ROWS || newCol < 0 || newCol >= COLS || (playerMove!=PlayerMove.UP && player.isUp())) {
             return moveDownPlatform(playerId, currentRow, currentCol, List.of(), List.of());
         }
 
@@ -175,8 +175,7 @@ public class Board {
         }
 
         Box below = grid[currentRow + 1][currentCol];
-        if (below instanceof TpPlatform) {
-            TpPlatform tp = (TpPlatform) below;
+        if (below instanceof TpPlatform tp) {
             Player player = players.get(playerId);
 
             int newRow = tp.getNewRow();
@@ -239,7 +238,7 @@ public class Board {
             affectedPlayers.add(new PlayerUpdate(paintingPlayer.getId(), paintingPlayer.getColor(), paintingPlayer.getScore()));
         }
 
-        if (previousColor != ColorStatus.WHITE && previousColor != newColor) {
+        if (previousColor != ColorStatus.WHITE) {
             Player previousPlayer = findPlayerByColor(previousColor);
             if (previousPlayer != null && previousPlayer.getScore() > 0) {
                 previousPlayer.setScore(previousPlayer.getScore() - 1);
@@ -275,7 +274,6 @@ public class Board {
         return players.get(uuid).isUp();
     }
 
-    //Herramientas para el bloqueo (sin efectos secundarios en getters) 
     private void ensureInQueue(UUID playerId) {
         if (!lockQueue.contains(playerId)) {
             lockQueue.add(playerId);
