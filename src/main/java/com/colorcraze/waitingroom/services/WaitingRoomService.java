@@ -9,6 +9,8 @@ import com.colorcraze.utils.enums.ColorStatus;
 import com.colorcraze.waitingroom.dtos.responses.WaitingRoomState;
 import com.colorcraze.waitingroom.models.WaitingRoom;
 
+import lombok.extern.slf4j.Slf4j;
+
 import java.security.SecureRandom;
 import java.util.Map;
 import java.util.Optional;
@@ -22,6 +24,7 @@ import java.util.concurrent.TimeUnit;
  * It handles creation, joining, leaving, color selection, countdown,
  * and starting the game when countdown ends.
  */
+@Slf4j
 @Service
 public class WaitingRoomService {
 
@@ -110,7 +113,7 @@ public class WaitingRoomService {
                         cleanupRoom(room, scheduler);
                     }
                 } catch (Exception e) {
-                    e.printStackTrace();
+                    log.error("Error while executing countdown for room {}", room.getRoomId(), e);
                     cleanupRoom(room, scheduler);
                 }
             }
