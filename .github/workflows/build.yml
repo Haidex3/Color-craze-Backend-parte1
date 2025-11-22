@@ -38,13 +38,13 @@ jobs:
                   distribution: "microsoft"
             - name: Run tests
               run: mvn test
-             #name: Generate test report
-              #run: mvn jacoco:report
-            #- name: Upload test report
-            #  uses: actions/upload-artifact@v4
-             # with:
-              #    name: test-reports
-               #   path: "${{ github.workspace }}/target/site/jacoco/"
-                #  retention-days: 5
+            - name: Generate test report
+              run: mvn jacoco:report
+            - name: Upload test report
+              uses: actions/upload-artifact@v4
+              with:
+                  name: test-reports
+                  path: "${{ github.workspace }}/target/site/jacoco/"
+                  retention-days: 5
             - name: final verify
               run: mvn clean verify
