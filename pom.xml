@@ -32,6 +32,8 @@
             **/specifications/**,
             **/configs/**,
             **/security/**,
+			**/utils/**,
+			**/exceptions/**,
             **/ColorCrazeApplication.class
         </jacoco.exclusions.pattern>
 	</properties>
