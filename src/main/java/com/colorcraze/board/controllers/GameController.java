@@ -1,6 +1,8 @@
 package com.colorcraze.board.controllers;
 
 import lombok.RequiredArgsConstructor;
+
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -20,6 +22,11 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class GameController {
 
+    private static final String ERROR_KEY = "error";
+    private static final String ROOM_NOT_FOUND_OR_EMPTY = "Sala no existe o está vacía";
+    private static final String GAME_CREATION_ERROR = "Error al crear el juego";
+    private static final String GAME_NOT_FOUND = "Juego no encontrado";
+
     private final BoardService boardService;
     private final WaitingRoomService waitingRoomService;
 
@@ -35,11 +42,20 @@ public class GameController {
     public ResponseEntity<Map<String, Object>> createGameFromRoom(@PathVariable String roomId) {
         WaitingRoomState roomState = waitingRoomService.getRoomState(roomId);
 
-        if (roomState == null || roomState.getPlayers().isEmpty()) {
-            return ResponseEntity.badRequest().body(Map.of("error", "Sala no existe o está vacía"));
+        if (roomState == null || roomState.getPlayers() == null || roomState.getPlayers().isEmpty()
+                || roomState.getPlayerColors() == null || roomState.getPlayerColors().isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of(ERROR_KEY, ROOM_NOT_FOUND_OR_EMPTY));
         }
+
         Board board = boardService.createBoardWithPlayers(roomState.getRoomId(), roomState.getPlayerColors());
+
+        if (board == null) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of(ERROR_KEY, GAME_CREATION_ERROR));
+        }
+
         waitingRoomService.removeRoom(roomId);
+
         return ResponseEntity.ok(Map.of(
                 "gameId", board.getGameId(),
                 "players", board.getPlayers()
@@ -57,11 +73,10 @@ public class GameController {
         Board board = boardService.getBoard(gameId);
 
         if (board == null) {
-            return ResponseEntity.status(404)
-                    .body(Map.of("error", "Juego no encontrado"));
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(Map.of(ERROR_KEY, GAME_NOT_FOUND));
         }
 
         return ResponseEntity.ok(board);
     }
-
 }

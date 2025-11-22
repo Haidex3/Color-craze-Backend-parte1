@@ -47,7 +47,7 @@ jobs:
           name: java-app
       
       - name: Login to Azure
-        uses: azure/login@v2
+        uses: azure/login@a457da9ea143d694b1b9c7c869ebb04ebe844ef5
         with:
           client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_F4CDD3421E024A778843B11D0DF45AB0 }}
           tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_C2B2FAEA1438449298FFF4C582263F42 }}
@@ -55,7 +55,7 @@ jobs:
 
       - name: Deploy to Azure Web App
         id: deploy-to-webapp
-        uses: azure/webapps-deploy@v3
+        uses: azure/webapps-deploy@657f0700ea5214d56a0400d8ac5e8023c963d25d
         with:
           app-name: 'ColorBack'
           slot-name: 'Production'

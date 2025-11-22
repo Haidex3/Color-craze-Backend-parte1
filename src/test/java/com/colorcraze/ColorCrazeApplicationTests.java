@@ -1,9 +1,8 @@
-package com.Color_craze;
+package com.colorcraze;
 
 import org.springframework.boot.test.context.SpringBootTest;
 
 @SpringBootTest
 class ColorCrazeApplicationTests {
-
 
 }
