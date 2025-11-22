@@ -29,6 +29,7 @@ public class FirebaseAuthService {
 
     private final JwtUtil jwtUtil;
     private final AuthUserRepository userRepository;
+    private final FirebaseAuth firebaseAuth;
 
     /**
      * Authenticates a user with Firebase ID token.
@@ -41,7 +42,8 @@ public class FirebaseAuthService {
      */
     public LoginResponse loginWithFirebase(FirebaseLoginRequest request) {
         try {
-            FirebaseToken decoded = FirebaseAuth.getInstance().verifyIdToken(request.getIdToken());
+            // Usar firebaseAuth inyectado en lugar de FirebaseAuth.getInstance()
+            FirebaseToken decoded = firebaseAuth.verifyIdToken(request.getIdToken());
 
             String uid = decoded.getUid();
             String email = decoded.getEmail();
