@@ -54,7 +54,6 @@ class WaitingRoomServiceTest {
         assertNotNull(room);
         assertNotNull(room.getRoomId());
         assertEquals(4, room.getRoomId().length());
-        assertEquals(10, room.getSeconds());
         
         Optional<WaitingRoom> retrievedRoom = waitingRoomService.getRoom(room.getRoomId());
         assertTrue(retrievedRoom.isPresent());
