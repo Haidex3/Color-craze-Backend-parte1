@@ -38,6 +38,7 @@
         </jacoco.exclusions.pattern>
 
 		<sonar.organization>haidex3</sonar.organization>
+		<sonar.projectKey>Haidex3_Color-craze-Backend-parte1</sonar.projectKey>
 	</properties>
 
 	<dependencies>
