@@ -36,6 +36,8 @@
 			**/exceptions/**,
             **/ColorCrazeApplication.class
         </jacoco.exclusions.pattern>
+
+		<sonar.organization>haidex3</sonar.organization>
 	</properties>
 
 	<dependencies>
