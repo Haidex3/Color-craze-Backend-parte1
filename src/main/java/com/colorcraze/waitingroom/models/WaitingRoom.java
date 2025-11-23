@@ -68,8 +68,6 @@ public class WaitingRoom {
             List<ColorStatus> availableColors = getAvailableColors();
             if (!availableColors.isEmpty()) {
                 playerColors.put(playerId, availableColors.get(0));
-            } else {
-                playerColors.put(playerId, ColorStatus.WHITE);
             }
             return new WaitingRoomState(
                 roomId,
@@ -127,8 +125,8 @@ public class WaitingRoom {
             synchronized (this) {
                 if (seconds > 0) {
                     seconds--;
-                } else {
-                    stopCountdown();
+                } else if(!scheduler.isShutdown()){
+                        stopCountdown();
                 }
             }
         }, 0, 1, TimeUnit.SECONDS);
@@ -138,7 +136,7 @@ public class WaitingRoom {
      * Stops the countdown timer if running.
      */
     public void stopCountdown() {
-        if (scheduler != null && !scheduler.isShutdown()) {
+        if (scheduler != null) {
             scheduler.shutdown();
         }
     }
