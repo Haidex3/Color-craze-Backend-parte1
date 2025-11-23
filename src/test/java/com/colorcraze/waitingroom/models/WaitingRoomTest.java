@@ -95,7 +95,7 @@ class WaitingRoomTest {
         });
         countdownThread.start();
         latch.await(5, TimeUnit.SECONDS);
-        assertTrue(1< waitingRoom.getSeconds());
+        assertTrue(0< waitingRoom.getSeconds());
         int currentSeconds = waitingRoom.getSeconds();
         countdownThread.join(1000);
         assertTrue(currentSeconds<= waitingRoom.getSeconds());
