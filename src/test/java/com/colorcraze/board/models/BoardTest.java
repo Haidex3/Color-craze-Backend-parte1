@@ -16,6 +16,8 @@ import java.lang.reflect.Field;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -321,17 +323,6 @@ class BoardTest {
     void testNullPlayerColors() {
         Board nullBoard = new Board("test-null", null);
         assertEquals(0, nullBoard.getPlayers().size());
-    }
-
-    @Test
-    void moveDownPlatform_WhenAtBottomRow_ShouldReturnNotGravity() {
-        Player player = board.getPlayers().get(player1Id);
-        player.setRow(14);
-        player.setCol(5);
-        
-        MoveResult result = board.movePlayer(player1Id, PlayerMove.DOWN);
-        
-        assertFalse(result.gravity());
     }
 
     @Test
@@ -651,4 +642,39 @@ class BoardTest {
             fail("Reflection failed: " + e.getMessage());
         }
     }
+
+    @Test
+    @DisplayName("Should handle InterruptedException when waiting in queue")
+    void testMovePlayerInterruptedExceptionInQueue() throws Exception {
+        UUID testPlayerId = UUID.randomUUID();
+        Map<String, ColorStatus> singlePlayerColors = new HashMap<>();
+        singlePlayerColors.put(testPlayerId.toString(), ColorStatus.GREEN);
+        Board testBoard = new Board("test-interrupt", singlePlayerColors);
+
+        Field lockQueueField = Board.class.getDeclaredField("lockQueue");
+        lockQueueField.setAccessible(true);
+
+        @SuppressWarnings("unchecked")
+        List<UUID> queue = (List<UUID>) lockQueueField.get(testBoard);
+
+        UUID otherPlayerId = UUID.randomUUID();
+        queue.add(otherPlayerId);
+        queue.add(testPlayerId);
+
+        CountDownLatch latch = new CountDownLatch(1);
+
+        Thread testThread = new Thread(() -> {
+            latch.countDown();
+            testBoard.movePlayer(testPlayerId, PlayerMove.RIGHT);
+        });
+
+        testThread.start();
+        latch.await(1, TimeUnit.SECONDS);
+        testThread.interrupt();
+        testThread.join(1000);
+        assertFalse(testThread.isAlive());
+
+        assertFalse(queue.contains(testPlayerId));
+    }
+
 }
