@@ -145,6 +145,7 @@ public class WaitingRoomService {
         Map<String, ColorStatus> playerColors = room.getPlayerColors();
         if (!playerColors.isEmpty()) {
             Board board = boardService.createBoardWithPlayers(room.getRoomId(), playerColors);
+            boardService.startGameTimer(board.getGameId(), DEFAULT_WAIT_SECONDS);
             messagingTemplate.convertAndSend("/topic/waiting-room/" + room.getRoomId() + "/start", board);
         }
     }

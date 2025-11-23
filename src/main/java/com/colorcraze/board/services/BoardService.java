@@ -1,12 +1,9 @@
 package com.colorcraze.board.services;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.*;
+import java.util.concurrent.*;
 
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 
 import com.colorcraze.board.dtos.responses.MoveResult;
@@ -28,6 +25,14 @@ import com.colorcraze.utils.enums.PlayerMove;
 public class BoardService {
 
     private final Map<String, Board> boards = new ConcurrentHashMap<>();
+    private final Map<String, ScheduledFuture<?>> gameTimers = new ConcurrentHashMap<>();
+    private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(4);
+
+    private final SimpMessagingTemplate messagingTemplate;
+
+    public BoardService(SimpMessagingTemplate messagingTemplate) {
+        this.messagingTemplate = messagingTemplate;
+    }
 
     /**
      * Creates a new board with players assigned specified colors.
@@ -94,6 +99,29 @@ public class BoardService {
     }
 
     /**
+     * Adds a new player with the specified color to an existing board.
+     *
+     * @param gameId the ID of the game
+     * @param color the color assigned to the new player
+     * @return the newly created {@link Player}
+     */
+    public Player addPlayerToBoard(String gameId, ColorStatus color) {
+        Board board = getBoard(gameId);
+        Player newPlayer = new Player(UUID.randomUUID(), color);
+        board.addPlayer(newPlayer);
+        return newPlayer;
+    }
+
+    /**
+     * Retrieves the set of all currently active board IDs.
+     *
+     * @return a {@link Set} of board IDs
+     */
+    public Set<String> getAllBoardIds() {
+        return boards.keySet();
+    }
+
+    /**
      * Moves a player on the board in the specified direction.
      * Handles special logic for upward moves and gravity effects.
      *
@@ -131,47 +159,58 @@ public class BoardService {
             board.setPlayerIsUp(uuid, false);
 
             if (lastStep != null) {
-                MoveResult finalResult = new MoveResult(
-                    uuid,
-                    lastStep.newRow(),
-                    lastStep.newCol(),
-                    totalPlatformUpdates,
-                    totalPlayerUpdates,
-                    lastStep.success(),
-                    lastStep.gravity()
-                );
-                results.add(finalResult);
+                results.add(new MoveResult(
+                        uuid,
+                        lastStep.newRow(),
+                        lastStep.newCol(),
+                        totalPlatformUpdates,
+                        totalPlayerUpdates,
+                        lastStep.success(),
+                        lastStep.gravity()
+                ));
             }
-
-            return results;
-        }
-
-        else {
+        } else {
             results.add(board.movePlayer(uuid, playerMove));
         }
+
         return results;
     }
 
     /**
-     * Adds a new player with the specified color to an existing board.
-     *
-     * @param gameId the ID of the game
-     * @param color the color assigned to the new player
-     * @return the newly created {@link Player}
+     * Starts a countdown timer for a game, sending periodic updates via WebSocket.
+     * 
+     * @param gameId the board's unique identifier
+     * @param durationSeconds the duration of the timer in seconds
      */
-    public Player addPlayerToBoard(String gameId, ColorStatus color) {
-        Board board = getBoard(gameId);
-        Player newPlayer = new Player(UUID.randomUUID(), color);
-        board.addPlayer(newPlayer);
-        return newPlayer;
+    public void startGameTimer(String gameId, int durationSeconds) {
+        if (gameTimers.containsKey(gameId)) return; // Ya existe timer
+
+        final int[] secondsLeft = {durationSeconds};
+
+        ScheduledFuture<?> future = scheduler.scheduleAtFixedRate(() -> {
+            if (secondsLeft[0] > 0) {
+                secondsLeft[0]--;
+                messagingTemplate.convertAndSend("/topic/board." + gameId, Map.of("timeLeft", secondsLeft[0]));
+            } else {
+                endGame(gameId);
+                ScheduledFuture<?> f = gameTimers.remove(gameId);
+                if (f != null) f.cancel(true);
+            }
+        }, 0, 1, TimeUnit.SECONDS);
+
+        gameTimers.put(gameId, future);
     }
 
     /**
-     * Retrieves the set of all currently active board IDs.
-     *
-     * @return a {@link Set} of board IDs
+     * Ends the game and broadcasts the final results to all subscribers via WebSocket.
+     * 
+     * @param gameId the board's unique identifier
      */
-    public Set<String> getAllBoardIds() {
-        return boards.keySet();
+    public void endGame(String gameId) {
+        Board board = getBoard(gameId);
+        messagingTemplate.convertAndSend("/topic/board." + gameId, Map.of(
+                "gameOver", true,
+                "players", board.getPlayers()
+        ));
     }
 }
