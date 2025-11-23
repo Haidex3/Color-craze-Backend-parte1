@@ -210,7 +210,8 @@ public class BoardService {
         Board board = getBoard(gameId);
         messagingTemplate.convertAndSend("/topic/board." + gameId, Map.of(
                 "gameOver", true,
-                "players", board.getPlayers()
+                "players", board.getPlayers().values()
         ));
+        boards.remove(gameId);
     }
 }
