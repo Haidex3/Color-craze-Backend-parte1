@@ -4,6 +4,9 @@ import com.colorcraze.configs.exceptions.FirebaseInitializationException;
 import com.google.auth.oauth2.GoogleCredentials;
 import com.google.firebase.FirebaseApp;
 import com.google.firebase.FirebaseOptions;
+import com.google.firebase.auth.FirebaseAuth;
+
+import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import jakarta.annotation.PostConstruct;
 
@@ -45,4 +48,10 @@ public class FirebaseConfig {
             throw new FirebaseInitializationException("Error inicializando Firebase", e);
         }
     }
+
+    @Bean
+    public FirebaseAuth firebaseAuth() {
+        return FirebaseAuth.getInstance();
+    }
+
 }
