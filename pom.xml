@@ -26,7 +26,6 @@
 		<jacoco.version>0.8.14</jacoco.version>
 		<jacoco.exclusions.pattern>
             **/aop/**,
-            **/models/**,
             **/dtos/**,
             **/enums/**,
             **/specifications/**,

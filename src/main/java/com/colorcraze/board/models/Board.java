@@ -185,12 +185,8 @@ public class Board {
             case DOWN  -> newRow++;
         }
 
-        if (newRow < 0 || newRow >= ROWS || newCol < 0 || newCol >= COLS || (playerMove!=PlayerMove.UP && player.isUp())) {
-            return moveDownPlatform(playerId, currentRow, currentCol, List.of(), List.of());
-        }
-
         Box destination = grid[newRow][newCol];
-        if (destination instanceof Platform || destination instanceof Player || destination instanceof TpPlatform) {
+        if (destination instanceof Platform || destination instanceof Player || destination instanceof TpPlatform || (playerMove!=PlayerMove.UP && player.isUp())) {
             return moveDownPlatform(playerId, currentRow, currentCol, List.of(),List.of());
         }
 
@@ -236,9 +232,6 @@ public class Board {
      * @return MoveResult representing the new state of the player and affected elements.
      */
     private MoveResult moveDownPlatform(UUID playerId, int currentRow, int currentCol, List<PlatformUpdate> affectedPlatforms, List<PlayerUpdate> affectedPlayers){
-        if (currentRow + 1 >= ROWS || currentCol < 0 || currentCol >= COLS) {
-            return new MoveResult(playerId, currentRow, currentCol, affectedPlatforms, affectedPlayers, false, false);
-        }
 
         Box below = grid[currentRow + 1][currentCol];
         if (below instanceof TpPlatform tp) {
@@ -246,10 +239,6 @@ public class Board {
 
             int newRow = tp.getNewRow();
             int newCol = tp.getNewCol();
-
-            if (newRow < 0 || newRow >= ROWS || newCol < 0 || newCol >= COLS) {
-                return new MoveResult(playerId, currentRow, currentCol, affectedPlatforms, affectedPlayers, false, false);
-            }
 
             grid[currentRow][currentCol] = new Box(ColorStatus.WHITE);
             player.setRow(newRow);
@@ -260,7 +249,7 @@ public class Board {
             return new MoveResult(playerId, newRow, newCol, updatedPlatforms, affectedPlayers, true, false);
         }
 
-        if (below instanceof Platform) {
+        if (below instanceof Platform || below instanceof Player) {
             return new MoveResult(playerId, currentRow, currentCol, affectedPlatforms, affectedPlayers, false, false);
         }
         return new MoveResult(playerId, currentRow, currentCol, affectedPlatforms, affectedPlayers, false, true);
