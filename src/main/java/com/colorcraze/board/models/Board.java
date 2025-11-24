@@ -187,7 +187,7 @@ public class Board {
 
         Box destination = grid[newRow][newCol];
         if (destination instanceof Platform || destination instanceof Player || destination instanceof TpPlatform || (playerMove!=PlayerMove.UP && player.isUp())) {
-            return moveDownPlatform(playerId, currentRow, currentCol, List.of(),List.of());
+            return moveDownPlatform(playerId, currentRow, currentCol, List.of(), List.of());
         }
 
         synchronized (gridLock) {
@@ -232,7 +232,7 @@ public class Board {
      * @return MoveResult representing the new state of the player and affected elements.
      */
     private MoveResult moveDownPlatform(UUID playerId, int currentRow, int currentCol, List<PlatformUpdate> affectedPlatforms, List<PlayerUpdate> affectedPlayers){
-
+        Player p = players.get(playerId);
         Box below = grid[currentRow + 1][currentCol];
         if (below instanceof TpPlatform tp) {
             Player player = players.get(playerId);
@@ -246,13 +246,13 @@ public class Board {
             grid[newRow][newCol] = player;
 
             List<PlatformUpdate> updatedPlatforms = updateAdjacentPlatforms(newRow, newCol, player.getColor(), affectedPlayers);
-            return new MoveResult(playerId, newRow, newCol, updatedPlatforms, affectedPlayers, true, false);
+            return new MoveResult(playerId, p.getRow(), p.getCol(), updatedPlatforms, affectedPlayers, true, false);
         }
 
         if (below instanceof Platform || below instanceof Player) {
-            return new MoveResult(playerId, currentRow, currentCol, affectedPlatforms, affectedPlayers, false, false);
+            return new MoveResult(playerId, p.getRow(), p.getCol(), affectedPlatforms, affectedPlayers, false, false);
         }
-        return new MoveResult(playerId, currentRow, currentCol, affectedPlatforms, affectedPlayers, false, true);
+        return new MoveResult(playerId, p.getRow(), p.getCol(), affectedPlatforms, affectedPlayers, false, true);
     }
 
 

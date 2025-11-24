@@ -79,6 +79,7 @@ public class GameSocketController {
 
             List<MoveResult> gravityResults = boardService.movePlayer(gameId, playerId, PlayerMove.DOWN);
             if (!processGravityResults(gravityResults, totalPlatformUpdates, totalPlayerUpdates)) {
+                lastStep = getLastStepFromResults(gravityResults);
                 break;
             }
             
