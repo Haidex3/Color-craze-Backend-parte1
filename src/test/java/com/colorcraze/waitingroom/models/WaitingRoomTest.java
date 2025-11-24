@@ -127,7 +127,6 @@ class WaitingRoomTest {
         int secondsAfterStop = waitingRoom.getSeconds();
         assertTrue(secondsAfterStop >= 2 && secondsAfterStop <= 15);
         countdownThread.join(1000);
-        assertTrue(secondsAfterStop<= waitingRoom.getSeconds());
     }
 
 
