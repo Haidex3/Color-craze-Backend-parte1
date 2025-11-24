@@ -42,36 +42,46 @@ public class FirebaseAuthService {
      */
     public LoginResponse loginWithFirebase(FirebaseLoginRequest request) {
         try {
-            // Usar firebaseAuth inyectado en lugar de FirebaseAuth.getInstance()
             FirebaseToken decoded = firebaseAuth.verifyIdToken(request.getIdToken());
 
             String uid = decoded.getUid();
             String email = decoded.getEmail();
             String name = decoded.getName();
 
-            Optional<AuthUser> maybe = userRepository.findById(uid);
+            boolean isGuest = (email == null || email.isBlank() || name == null || name.isBlank());
 
-            AuthUser user;
-            if (maybe.isPresent()) {
-                user = maybe.get();
-                user.setEmail(email);
-                user.setDisplayName(name);
-            } else {
-                String role = "USER";
-                user = new AuthUser(uid, email, name, role, null);
+            AuthUser user = null;
+            if (!isGuest) {
+                Optional<AuthUser> maybe = userRepository.findById(uid);
+                if (maybe.isPresent()) {
+                    user = maybe.get();
+                    user.setEmail(email);
+                    user.setDisplayName(name);
+                } else {
+                    user = new AuthUser(uid, email, name, "USER", null);
+                }
             }
-
-            String refreshToken = "";
-            String jwt = jwtUtil.generateToken(uid, user.getRole());
-
-            user.setRefreshToken(refreshToken);
-            userRepository.save(user);
-
+            String role;
+            if (isGuest) {
+                String suffix = String.valueOf((int)(Math.random() * 9000) + 1000);
+                email = "guest" + suffix + "@colorcraze.com";
+                name = "Guest " + suffix;
+                role ="GUEST";
+            } else{
+                role ="USER";
+            }
+            String jwt = jwtUtil.generateToken(uid, role);
+            String refreshToken = null;
+            if (!isGuest) {
+                refreshToken = UUID.randomUUID().toString();
+                user.setRefreshToken(refreshToken);
+                userRepository.save(user);
+            }
             UserData ud = new UserData(
-                    user.getId(),
-                    user.getEmail(),
-                    user.getDisplayName(),
-                    user.getRole()
+                    uid,
+                    email,
+                    name,
+                    role
             );
 
             return new LoginResponse(jwt, refreshToken, ud);
@@ -80,6 +90,7 @@ public class FirebaseAuthService {
             throw new FirebaseLoginException("Error validating Firebase ID token", e);
         }
     }
+
 
     /**
      * Refreshes the authentication tokens for a user given a valid refresh token.
