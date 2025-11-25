@@ -10,7 +10,6 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 
 import com.colorcraze.configs.filters.FirebaseTokenFilter;
 import com.colorcraze.configs.filters.LoggingContextFilter;
-import com.colorcraze.configs.filters.RateLimitFilter;
 
 /**
  * Security configuration for the application.
@@ -24,7 +23,6 @@ public class SecurityConfig {
 
     private final FirebaseTokenFilter firebaseTokenFilter;
     private final LoggingContextFilter loggingContextFilter;
-    private final RateLimitFilter rateLimitFilter;
 
     /**
      * Configures the Spring Security filter chain.
@@ -68,8 +66,6 @@ public class SecurityConfig {
                 .addFilterBefore(loggingContextFilter, UsernamePasswordAuthenticationFilter.class)
 
                 .addFilterAfter(firebaseTokenFilter, LoggingContextFilter.class)
-
-                .addFilterAfter(rateLimitFilter, FirebaseTokenFilter.class)
 
                 .httpBasic(httpBasic -> {});
 

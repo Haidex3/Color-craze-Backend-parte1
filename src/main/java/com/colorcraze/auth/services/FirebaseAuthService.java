@@ -11,6 +11,7 @@ import com.colorcraze.utils.JwtUtil;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseAuthException;
 import com.google.firebase.auth.FirebaseToken;
+import java.util.concurrent.ThreadLocalRandom;
 
 import lombok.AllArgsConstructor;
 
@@ -63,7 +64,7 @@ public class FirebaseAuthService {
             }
             String role;
             if (isGuest) {
-                String suffix = String.valueOf((int)(Math.random() * 9000) + 1000);
+                String suffix = String.valueOf(ThreadLocalRandom.current().nextInt(1000, 10000));
                 email = "guest" + suffix + "@colorcraze.com";
                 name = "Guest " + suffix;
                 role ="GUEST";
