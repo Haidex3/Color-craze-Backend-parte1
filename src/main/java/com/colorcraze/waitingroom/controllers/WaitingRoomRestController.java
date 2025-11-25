@@ -7,6 +7,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.web.bind.annotation.*;
 
+import com.colorcraze.configs.ratelimit.RateLimit;
 import com.colorcraze.waitingroom.dtos.responses.WaitingRoomState;
 import com.colorcraze.waitingroom.models.WaitingRoom;
 import com.colorcraze.waitingroom.services.WaitingRoomService;
@@ -65,6 +66,7 @@ public class WaitingRoomRestController {
      * @return ResponseEntity containing the updated waiting room state, or a bad request response if the room is not found or join fails.
      */
     @PostMapping("/join/{roomId}/{playerId}")
+    @RateLimit(limit = 3)
     public ResponseEntity<WaitingRoomState> joinRoom(
             @PathVariable String roomId,
             @PathVariable String playerId

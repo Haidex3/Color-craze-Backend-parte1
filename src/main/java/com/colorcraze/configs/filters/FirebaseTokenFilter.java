@@ -50,11 +50,13 @@ public class FirebaseTokenFilter extends OncePerRequestFilter {
         try {
             FirebaseToken decoded = FirebaseAuth.getInstance().verifyIdToken(token);
 
-            String email = decoded.getEmail();
+            String uid = decoded.getUid();
+
+            request.setAttribute("firebaseUid", uid);
 
             UsernamePasswordAuthenticationToken auth =
                     new UsernamePasswordAuthenticationToken(
-                            email,
+                            uid,
                             null,
                             List.of()
                     );

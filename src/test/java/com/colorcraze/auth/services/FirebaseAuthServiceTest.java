@@ -17,6 +17,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.Optional;
+import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -44,9 +45,11 @@ class FirebaseAuthServiceTest {
         String email = "test@example.com";
         String name = "Test User";
         String jwt = "test-jwt";
+        String refreshToken = UUID.randomUUID().toString();
         
         FirebaseLoginRequest request = new FirebaseLoginRequest("firebase-id-token");
         FirebaseToken firebaseToken = mock(FirebaseToken.class);
+        new AuthUser(uid, email, name, "USER", refreshToken);
         
         when(firebaseToken.getUid()).thenReturn(uid);
         when(firebaseToken.getEmail()).thenReturn(email);
@@ -59,7 +62,8 @@ class FirebaseAuthServiceTest {
 
         assertNotNull(response);
         assertEquals(jwt, response.getToken());
-        assertEquals("", response.getRefreshToken());
+        assertNotNull(response.getRefreshToken());
+        assertFalse(response.getRefreshToken().isEmpty());
         
         UserData userData = response.getUserData();
         assertNotNull(userData);
@@ -94,7 +98,8 @@ class FirebaseAuthServiceTest {
 
         assertNotNull(response);
         assertEquals(jwt, response.getToken());
-        assertEquals("", response.getRefreshToken());
+        assertNotNull(response.getRefreshToken());
+        assertFalse(response.getRefreshToken().isEmpty());
         
         UserData userData = response.getUserData();
         assertNotNull(userData);
@@ -107,7 +112,7 @@ class FirebaseAuthServiceTest {
     }
 
     @Test
-    void loginWithFirebase_NullEmail_UsesNull() throws FirebaseAuthException {
+    void loginWithFirebase_NullEmail_CreatesGuestUser() throws FirebaseAuthException {
         String uid = "test-uid";
         String jwt = "test-jwt";
         
@@ -118,20 +123,27 @@ class FirebaseAuthServiceTest {
         when(firebaseToken.getEmail()).thenReturn(null);
         when(firebaseToken.getName()).thenReturn("Test User");
         when(firebaseAuth.verifyIdToken(request.getIdToken())).thenReturn(firebaseToken);
-        when(userRepository.findById(uid)).thenReturn(Optional.empty());
-        when(jwtUtil.generateToken(uid, "USER")).thenReturn(jwt);
+        when(jwtUtil.generateToken(uid, "GUEST")).thenReturn(jwt);
 
         LoginResponse response = firebaseAuthService.loginWithFirebase(request);
 
         assertNotNull(response);
-        assertNotNull(response.getUserData());
-        assertNull(response.getUserData().getEmail());
+        assertEquals(jwt, response.getToken());
+        assertNull(response.getRefreshToken());
         
-        verify(userRepository).save(any(AuthUser.class));
+        UserData userData = response.getUserData();
+        assertNotNull(userData);
+        assertEquals(uid, userData.getId());
+        assertEquals("GUEST", userData.getRole());
+        assertTrue(userData.getEmail().matches("guest\\d{4}@colorcraze\\.com"));
+        assertTrue(userData.getDisplayName().matches("Guest \\d{4}"));
+        
+        verify(userRepository, never()).findById(anyString());
+        verify(userRepository, never()).save(any(AuthUser.class));
     }
 
     @Test
-    void loginWithFirebase_NullName_UsesNull() throws FirebaseAuthException {
+    void loginWithFirebase_NullName_CreatesGuestUser() throws FirebaseAuthException {
         String uid = "test-uid";
         String email = "test@example.com";
         String jwt = "test-jwt";
@@ -143,16 +155,75 @@ class FirebaseAuthServiceTest {
         when(firebaseToken.getEmail()).thenReturn(email);
         when(firebaseToken.getName()).thenReturn(null);
         when(firebaseAuth.verifyIdToken(request.getIdToken())).thenReturn(firebaseToken);
-        when(userRepository.findById(uid)).thenReturn(Optional.empty());
-        when(jwtUtil.generateToken(uid, "USER")).thenReturn(jwt);
+        when(jwtUtil.generateToken(uid, "GUEST")).thenReturn(jwt);
 
         LoginResponse response = firebaseAuthService.loginWithFirebase(request);
 
         assertNotNull(response);
-        assertNotNull(response.getUserData());
-        assertNull(response.getUserData().getDisplayName());
+        assertEquals(jwt, response.getToken());
+        assertNull(response.getRefreshToken());
         
-        verify(userRepository).save(any(AuthUser.class));
+        UserData userData = response.getUserData();
+        assertNotNull(userData);
+        assertEquals(uid, userData.getId());
+        assertEquals("GUEST", userData.getRole());
+        
+        assertTrue(userData.getEmail().matches("guest\\d{4}@colorcraze\\.com"));
+        assertTrue(userData.getDisplayName().matches("Guest \\d{4}"));
+        
+        verify(userRepository, never()).findById(anyString());
+        verify(userRepository, never()).save(any(AuthUser.class));
+    }
+
+    @Test
+    void loginWithFirebase_BlankEmail_CreatesGuestUser() throws FirebaseAuthException {
+        String uid = "test-uid";
+        String jwt = "test-jwt";
+        
+        FirebaseLoginRequest request = new FirebaseLoginRequest("firebase-id-token");
+        FirebaseToken firebaseToken = mock(FirebaseToken.class);
+        
+        when(firebaseToken.getUid()).thenReturn(uid);
+        when(firebaseToken.getEmail()).thenReturn("");
+        when(firebaseToken.getName()).thenReturn("Test User");
+        when(firebaseAuth.verifyIdToken(request.getIdToken())).thenReturn(firebaseToken);
+        when(jwtUtil.generateToken(uid, "GUEST")).thenReturn(jwt);
+
+        LoginResponse response = firebaseAuthService.loginWithFirebase(request);
+
+        assertNotNull(response);
+        assertEquals(jwt, response.getToken());
+        assertNull(response.getRefreshToken());
+        assertEquals("GUEST", response.getUserData().getRole());
+        
+        verify(userRepository, never()).findById(anyString());
+        verify(userRepository, never()).save(any(AuthUser.class));
+    }
+
+    @Test
+    void loginWithFirebase_BlankName_CreatesGuestUser() throws FirebaseAuthException {
+        String uid = "test-uid";
+        String email = "test@example.com";
+        String jwt = "test-jwt";
+        
+        FirebaseLoginRequest request = new FirebaseLoginRequest("firebase-id-token");
+        FirebaseToken firebaseToken = mock(FirebaseToken.class);
+        
+        when(firebaseToken.getUid()).thenReturn(uid);
+        when(firebaseToken.getEmail()).thenReturn(email);
+        when(firebaseToken.getName()).thenReturn("");
+        when(firebaseAuth.verifyIdToken(request.getIdToken())).thenReturn(firebaseToken);
+        when(jwtUtil.generateToken(uid, "GUEST")).thenReturn(jwt);
+
+        LoginResponse response = firebaseAuthService.loginWithFirebase(request);
+
+        assertNotNull(response);
+        assertEquals(jwt, response.getToken());
+        assertNull(response.getRefreshToken());
+        assertEquals("GUEST", response.getUserData().getRole());
+        
+        verify(userRepository, never()).findById(anyString());
+        verify(userRepository, never()).save(any(AuthUser.class));
     }
 
     @Test
@@ -175,6 +246,7 @@ class FirebaseAuthServiceTest {
         assertEquals(newJwt, response.getToken());
         assertNotNull(response.getRefreshToken());
         assertFalse(response.getRefreshToken().isEmpty());
+        assertNotEquals(refreshToken, response.getRefreshToken());
         
         UserData userData = response.getUserData();
         assertNotNull(userData);
