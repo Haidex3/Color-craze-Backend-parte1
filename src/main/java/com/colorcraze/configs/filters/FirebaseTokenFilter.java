@@ -33,10 +33,21 @@ public class FirebaseTokenFilter extends OncePerRequestFilter {
      * @throws IOException if an I/O error occurs
      */
     @Override
-    protected void doFilterInternal(
-            HttpServletRequest request,
-            HttpServletResponse response,
-            FilterChain chain) throws ServletException, IOException {
+    protected void doFilterInternal(HttpServletRequest request,
+                                    HttpServletResponse response,
+                                    FilterChain chain) throws ServletException, IOException {
+
+        if ("OPTIONS".equalsIgnoreCase(request.getMethod())) {
+            response.setStatus(HttpServletResponse.SC_OK);
+            chain.doFilter(request, response);
+            return;
+        }
+
+        String path = request.getRequestURI();
+        if (path.startsWith("/api/auth/")||(path.startsWith("/health"))) {
+            chain.doFilter(request, response);
+            return;
+        }
 
         String header = request.getHeader("Authorization");
 
@@ -45,21 +56,14 @@ public class FirebaseTokenFilter extends OncePerRequestFilter {
             return;
         }
 
-        String token = header.substring(7);
-
         try {
+            String token = header.substring(7);
             FirebaseToken decoded = FirebaseAuth.getInstance().verifyIdToken(token);
-
             String uid = decoded.getUid();
 
             request.setAttribute("firebaseUid", uid);
-
             UsernamePasswordAuthenticationToken auth =
-                    new UsernamePasswordAuthenticationToken(
-                            uid,
-                            null,
-                            List.of()
-                    );
+                    new UsernamePasswordAuthenticationToken(uid, null, List.of());
 
             SecurityContextHolder.getContext().setAuthentication(auth);
 
@@ -70,4 +74,5 @@ public class FirebaseTokenFilter extends OncePerRequestFilter {
 
         chain.doFilter(request, response);
     }
+
 }
