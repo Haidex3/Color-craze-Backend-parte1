@@ -1,3 +1,6 @@
+# Color Craze
+## Haider Andres Rodriguez Maldonado
+
 # **Integración de SonarCloud en el Backend**
 
 ## 1. Introducción
