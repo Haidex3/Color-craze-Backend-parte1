@@ -37,7 +37,7 @@ class BoardServiceTest {
     @Mock
     private ScheduledFuture<?> scheduledFuture;
 
-    private BoardService boardService = new BoardService(null, messagingTemplate, null);;
+    private BoardService boardService = new BoardService(null, messagingTemplate, null, null);;;
 
     @Test
     void createBoardWithPlayers_Success() {
@@ -420,7 +420,7 @@ class BoardServiceTest {
 
     @Test
     void startGameTimer_Success() {
-        boardService = new BoardService(null, messagingTemplate, null);;
+        boardService = new BoardService(null, messagingTemplate, null, null);
         
         String gameId = "test-game";
         Map<String, ColorStatus> playerColors = Map.of(
@@ -440,7 +440,7 @@ class BoardServiceTest {
 
     @Test
     void startGameTimer_AlreadyExists_DoesNotStartNewTimer() {
-        boardService = spy(new BoardService(null, messagingTemplate, null));
+        boardService = spy(new BoardService(null, messagingTemplate, null, null));
         
         String gameId = "test-game";
         Map<String, ColorStatus> playerColors = Map.of(
@@ -461,7 +461,7 @@ class BoardServiceTest {
 
     @Test
     void startGameTimer_CountdownDecrementsCorrectly() {
-        boardService = new BoardService(null, messagingTemplate, null);;
+        boardService = new BoardService(null, messagingTemplate, null, null);
 
         String gameId = "test-game";
         Map<String, ColorStatus> playerColors = Map.of(
@@ -497,7 +497,7 @@ class BoardServiceTest {
 
     @Test
     void startGameTimer_ReachesZero_EndsGame() {
-        boardService = new BoardService(null, messagingTemplate, null);;
+        boardService = new BoardService(null, messagingTemplate, null, null);
 
         String gameId = "test-game";
         Map<String, ColorStatus> playerColors = Map.of(
@@ -527,7 +527,7 @@ class BoardServiceTest {
 
     @Test
     void startGameTimer_RemovesBoardAfterGameEnd() {
-        boardService = new BoardService(null, messagingTemplate, null);;
+        boardService = new BoardService(null, messagingTemplate, null, null);
         
         String gameId = "test-game";
         Map<String, ColorStatus> playerColors = Map.of(
@@ -549,7 +549,7 @@ class BoardServiceTest {
 
     @Test
     void endGame_Success() {
-        boardService = new BoardService(null, messagingTemplate, null);;
+        boardService = new BoardService(null, messagingTemplate, null, null);
 
         String gameId = "test-game";
         Map<String, ColorStatus> playerColors = Map.of(
@@ -576,7 +576,7 @@ class BoardServiceTest {
 
     @Test
     void startGameTimer_MultipleGames_IndependentTimers() {
-        boardService = new BoardService(null, messagingTemplate, null);
+        boardService = new BoardService(null, messagingTemplate, null, null);
         
         String gameId1 = "game-1";
         String gameId2 = "game-2";
@@ -608,7 +608,7 @@ class BoardServiceTest {
 
     @Test
     void startGameTimer_CancelsPreviousTimer_WhenNewTimerStarted() {
-        boardService = new BoardService(null, messagingTemplate, null);
+        boardService = new BoardService(null, messagingTemplate, null, null);
         
         String gameId = "test-game";
         Map<String, ColorStatus> playerColors = Map.of(

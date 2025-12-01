@@ -18,6 +18,7 @@ import com.colorcraze.board.models.Platform;
 import com.colorcraze.board.models.Player;
 import com.colorcraze.utils.enums.ColorStatus;
 import com.colorcraze.utils.enums.PlayerMove;
+import java.nio.charset.StandardCharsets;
 
 /**
  * Service responsible for managing game boards and handling player moves.
@@ -32,13 +33,16 @@ public class BoardService {
     private final ChannelTopic boardTopic;
     private final Map<String, ScheduledFuture<?>> gameTimers = new ConcurrentHashMap<>();
     private final ThreadPoolTaskScheduler scheduler = new ThreadPoolTaskScheduler();
+    private final String serverId;
 
     public BoardService(RedisTemplate<String, Object> redisTemplate,
                         SimpMessagingTemplate messagingTemplate,
-                        ChannelTopic boardTopic) {
+                        ChannelTopic boardTopic,
+                        String serverId) {
         this.redisTemplate = redisTemplate;
         this.messagingTemplate = messagingTemplate;
         this.boardTopic = boardTopic;
+        this.serverId = serverId;
         scheduler.initialize();
     }
 
@@ -140,15 +144,22 @@ public class BoardService {
         List<MoveResult> results = boardServiceLocalMove(board, playerId, playerMove);
 
         redisTemplate.opsForValue().set("board:" + gameId, board);
-        redisTemplate.convertAndSend(boardTopic.getTopic(), Map.of(
-                "gameId", gameId,
-                "playerId", playerId,
-                "move", playerMove.name(),
-                "results", results
-        ));
+
+        if (results != null) {
+            for (MoveResult r : results) {
+                Map<String, Object> msg = Map.of(
+                        "type", "move",
+                        "gameId", gameId,
+                        "origin", serverId,
+                        "payload", r
+                );
+                redisTemplate.convertAndSend(boardTopic.getTopic(), msg);
+            }
+        }
 
         return results;
     }
+
 
     private List<MoveResult> boardServiceLocalMove(Board board, String playerId, PlayerMove playerMove) {
         UUID uuid = UUID.fromString(playerId);
@@ -208,7 +219,18 @@ public class BoardService {
         ScheduledFuture<?> future = scheduler.scheduleAtFixedRate(() -> {
             if (secondsLeft[0] > 0) {
                 secondsLeft[0]--;
+                // local websocket (sigue existiendo)
                 messagingTemplate.convertAndSend("/topic/board." + gameId, Map.of("timeLeft", secondsLeft[0]));
+
+                // publish via redis so other nodes receive it
+                Map<String, Object> msg = Map.of(
+                    "type", "timer",
+                    "gameId", gameId,
+                    "origin", serverId,
+                    "payload", Map.of("timeLeft", secondsLeft[0])
+                );
+                redisTemplate.convertAndSend(boardTopic.getTopic(), msg);
+
             } else {
                 endGame(gameId);
                 ScheduledFuture<?> f = gameTimers.remove(gameId);
@@ -219,6 +241,7 @@ public class BoardService {
         gameTimers.put(gameId, future);
     }
 
+
     /**
      * Ends the game and broadcasts the final results to all subscribers via WebSocket.
      * 
@@ -226,10 +249,22 @@ public class BoardService {
      */
     public void endGame(String gameId) {
         Board board = getBoard(gameId);
+
+        // Local send
         messagingTemplate.convertAndSend("/topic/board." + gameId, Map.of(
                 "gameOver", true,
                 "players", board.getPlayers().values()
         ));
+
+        // Publish endGame to redis so other nodes re-broadcast
+        Map<String, Object> msg = Map.of(
+            "type", "end",
+            "gameId", gameId,
+            "origin", serverId,
+            "payload", Map.of("gameOver", true, "players", board.getPlayers().values())
+        );
+        redisTemplate.convertAndSend(boardTopic.getTopic(), msg);
+
         redisTemplate.delete("board:" + gameId);
     }
 }

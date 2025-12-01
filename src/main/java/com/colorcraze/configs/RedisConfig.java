@@ -1,5 +1,7 @@
 package com.colorcraze.configs;
 
+import java.util.UUID;
+
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
@@ -53,4 +55,8 @@ public class RedisConfig {
         return container;
     }
 
+    @Bean
+    public String serverId() {
+        return UUID.randomUUID().toString();
+    }
 }
