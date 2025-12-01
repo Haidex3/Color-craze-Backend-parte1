@@ -1,29 +1,36 @@
 # ──────────────────────────────────────────────
 # Etapa 1: Build con Maven
 # ──────────────────────────────────────────────
-FROM maven:3.9.6-eclipse-temurin-21-slim AS builder
+FROM maven:3.9.11 AS builder
 WORKDIR /app
 
-# Copiamos pom.xml y descargamos dependencias en cache
 COPY pom.xml .
 RUN mvn -B -e -ntp dependency:go-offline
 
-# Copiar el código fuente
 COPY src ./src
+RUN mvn -B -e -ntp -DskipTests package
 
-# Compilar y empaquetar
-RUN mvn -B -e -ntp clean package -DskipTests
 
 # ──────────────────────────────────────────────
-# Etapa 2: Imagen final liviana JRE
+# Etapa 2: Imagen Final (Nginx + Java)
 # ──────────────────────────────────────────────
 FROM eclipse-temurin:21-jre
 
+# Instalar Nginx
+RUN apt-get update && apt-get install -y nginx && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
 
-# Copiar JAR generado de la etapa anterior
+# Copiamos el JAR compilado
 COPY --from=builder /app/target/*.jar app.jar
 
-EXPOSE 8080
+# Copiamos configuración nginx
+COPY infra/nginx.conf /etc/nginx/nginx.conf
 
-ENTRYPOINT ["java", "-jar", "app.jar"]
+# Copiamos script de arranque
+COPY infra/start.sh /start.sh
+RUN chmod +x /start.sh
+
+EXPOSE 80
+
+CMD ["/start.sh"]
