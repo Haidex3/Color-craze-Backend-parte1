@@ -21,6 +21,12 @@ public class TpPlatform extends Box{
         this.newRow = newRow; 
     }
 
+    public TpPlatform() {
+        super(null);
+        this.newCol = 0;
+        this.newRow = 0; 
+    }
+
     public int getNewCol() {
         return newCol;
     }

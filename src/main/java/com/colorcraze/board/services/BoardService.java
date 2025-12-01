@@ -3,7 +3,10 @@ package com.colorcraze.board.services;
 import java.util.*;
 import java.util.concurrent.*;
 
+import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.listener.ChannelTopic;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
 import org.springframework.stereotype.Service;
 
 import com.colorcraze.board.dtos.responses.MoveResult;
@@ -19,19 +22,24 @@ import com.colorcraze.utils.enums.PlayerMove;
 /**
  * Service responsible for managing game boards and handling player moves.
  * Provides methods to create boards, retrieve boards, manipulate blocks, 
- * move players, and manage board state.
+ * move players, and manage board state using Redis as a backing store.
  */
 @Service
 public class BoardService {
 
-    private final Map<String, Board> boards = new ConcurrentHashMap<>();
-    private final Map<String, ScheduledFuture<?>> gameTimers = new ConcurrentHashMap<>();
-    private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(4);
-
+    private final RedisTemplate<String, Object> redisTemplate;
     private final SimpMessagingTemplate messagingTemplate;
+    private final ChannelTopic boardTopic;
+    private final Map<String, ScheduledFuture<?>> gameTimers = new ConcurrentHashMap<>();
+    private final ThreadPoolTaskScheduler scheduler = new ThreadPoolTaskScheduler();
 
-    public BoardService(SimpMessagingTemplate messagingTemplate) {
+    public BoardService(RedisTemplate<String, Object> redisTemplate,
+                        SimpMessagingTemplate messagingTemplate,
+                        ChannelTopic boardTopic) {
+        this.redisTemplate = redisTemplate;
         this.messagingTemplate = messagingTemplate;
+        this.boardTopic = boardTopic;
+        scheduler.initialize();
     }
 
     /**
@@ -43,19 +51,13 @@ public class BoardService {
      * @throws IllegalStateException if a board with the same ID already exists
      */
     public Board createBoardWithPlayers(String gameId, Map<String, ColorStatus> playerColors) {
-        if (boards.containsKey(gameId)) {
-            throw new IllegalStateException("El tablero con id " + gameId + " ya existe");
+        String key = "board:" + gameId;
+        if (Boolean.TRUE.equals(redisTemplate.hasKey(key))) {
+            throw new IllegalStateException("Board with id " + gameId + " already exists");
         }
 
         Board newBoard = new Board(gameId, playerColors);
-        if (playerColors != null) {
-            playerColors.forEach((playerId, color) -> {
-                Player player = new Player(UUID.fromString(playerId), color);
-                newBoard.addPlayer(player);
-            });
-        }
-
-        boards.put(gameId, newBoard);
+        redisTemplate.opsForValue().set(key, newBoard);
         return newBoard;
     }
 
@@ -67,10 +69,9 @@ public class BoardService {
      * @throws IllegalStateException if no board exists for the given ID
      */
     public Board getBoard(String gameId) {
-        Board board = boards.get(gameId);
-        if (board == null) {
-            throw new IllegalStateException("No existe un tablero con id " + gameId);
-        }
+        String key = "board:" + gameId;
+        Board board = (Board) redisTemplate.opsForValue().get(key);
+        if (board == null) throw new IllegalStateException("No board exists with id " + gameId);
         return board;
     }
 
@@ -95,7 +96,9 @@ public class BoardService {
      * @param block the {@link Box} to place
      */
     public void setBlock(String gameId, int row, int col, Box block) {
-        getBoard(gameId).getGrid()[row][col] = block;
+        Board board = getBoard(gameId);
+        board.getGrid()[row][col] = block;
+        redisTemplate.opsForValue().set("board:" + gameId, board);
     }
 
     /**
@@ -109,6 +112,7 @@ public class BoardService {
         Board board = getBoard(gameId);
         Player newPlayer = new Player(UUID.randomUUID(), color);
         board.addPlayer(newPlayer);
+        redisTemplate.opsForValue().set("board:" + gameId, board);
         return newPlayer;
     }
 
@@ -118,7 +122,8 @@ public class BoardService {
      * @return a {@link Set} of board IDs
      */
     public Set<String> getAllBoardIds() {
-        return boards.keySet();
+        // Redis does not provide a direct way to list keys in production, adjust if needed
+        return redisTemplate.keys("board:*");
     }
 
     /**
@@ -132,8 +137,21 @@ public class BoardService {
      */
     public List<MoveResult> movePlayer(String gameId, String playerId, PlayerMove playerMove) {
         Board board = getBoard(gameId);
-        UUID uuid = UUID.fromString(playerId);
+        List<MoveResult> results = boardServiceLocalMove(board, playerId, playerMove);
 
+        redisTemplate.opsForValue().set("board:" + gameId, board);
+        redisTemplate.convertAndSend(boardTopic.getTopic(), Map.of(
+                "gameId", gameId,
+                "playerId", playerId,
+                "move", playerMove.name(),
+                "results", results
+        ));
+
+        return results;
+    }
+
+    private List<MoveResult> boardServiceLocalMove(Board board, String playerId, PlayerMove playerMove) {
+        UUID uuid = UUID.fromString(playerId);
         List<MoveResult> results = new ArrayList<>();
 
         if (playerMove == PlayerMove.UP) {
@@ -183,7 +201,7 @@ public class BoardService {
      * @param durationSeconds the duration of the timer in seconds
      */
     public void startGameTimer(String gameId, int durationSeconds) {
-        if (gameTimers.containsKey(gameId)) return; // Ya existe timer
+        if (gameTimers.containsKey(gameId)) return;
 
         final int[] secondsLeft = {durationSeconds};
 
@@ -196,7 +214,7 @@ public class BoardService {
                 ScheduledFuture<?> f = gameTimers.remove(gameId);
                 if (f != null) f.cancel(true);
             }
-        }, 0, 1, TimeUnit.SECONDS);
+        }, 1000);
 
         gameTimers.put(gameId, future);
     }
@@ -212,6 +230,6 @@ public class BoardService {
                 "gameOver", true,
                 "players", board.getPlayers().values()
         ));
-        boards.remove(gameId);
+        redisTemplate.delete("board:" + gameId);
     }
 }

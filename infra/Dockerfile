@@ -16,8 +16,9 @@ RUN mvn -B -e -ntp -DskipTests package
 # ──────────────────────────────────────────────
 FROM eclipse-temurin:21-jre
 
-# Instalar Nginx
-RUN apt-get update && apt-get install -y nginx && rm -rf /var/lib/apt/lists/*
+# Instalar Nginx + Redis
+RUN apt-get update && apt-get install -y nginx redis-server && rm -rf /var/lib/apt/lists/*
+
 
 WORKDIR /app
 
