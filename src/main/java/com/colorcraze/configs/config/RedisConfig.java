@@ -1,4 +1,4 @@
-package com.colorcraze.configs;
+package com.colorcraze.configs.config;
 
 import java.util.UUID;
 
