@@ -98,16 +98,14 @@ public class BoardService {
 
         redisTemplate.opsForValue().set(BOARD_KEY_PREFIX + gameId, board);
 
-        if (results != null) {
-            for (MoveResult r : results) {
-                Map<String, Object> msg = Map.of(
-                        TYPE_FIELD, "move",
-                        GAME_ID_FIELD, gameId,
-                        ORIGIN_FIELD, serverId,
-                        PAYLOAD_FIELD, r
-                );
-                redisTemplate.convertAndSend(boardTopic.getTopic(), msg);
-            }
+        for (MoveResult r : results) {
+            Map<String, Object> msg = Map.of(
+                    TYPE_FIELD, "move",
+                    GAME_ID_FIELD, gameId,
+                    ORIGIN_FIELD, serverId,
+                    PAYLOAD_FIELD, r
+            );
+            redisTemplate.convertAndSend(boardTopic.getTopic(), msg);
         }
 
         return results;
@@ -178,7 +176,7 @@ public class BoardService {
             } else {
                 endGame(gameId);
                 ScheduledFuture<?> f = gameTimers.remove(gameId);
-                if (f != null) f.cancel(true);
+                f.cancel(true);
             }
         }, Duration.ofSeconds(1));
 

@@ -494,7 +494,119 @@ class BoardServiceTest {
         verify(redisTemplate).keys("board:*");
     }
 
+    @SuppressWarnings({ "unchecked", "rawtypes" })
+    @Test
+    void startGameTimer_Success() {
+
+        ArgumentCaptor<Runnable> runnableCaptor = ArgumentCaptor.forClass(Runnable.class);
+        when(taskScheduler.scheduleAtFixedRate(runnableCaptor.capture(), any(Duration.class)))
+            .thenReturn((ScheduledFuture) scheduledFuture);
+
+        boardService.startGameTimer(gameId, 1);
+
+        Runnable scheduledTask = runnableCaptor.getValue();
+        scheduledTask.run();
+
+        verify(messagingTemplate, atLeastOnce())
+            .convertAndSend(eq("/topic/board." + gameId), any(Map.class));
+    }
+
+    @Test
+    void startGameTimer_AlreadyExists_DoesNotStartNewTimer() {
+        try {
+            var timersField = BoardService.class.getDeclaredField("gameTimers");
+            timersField.setAccessible(true);
+            @SuppressWarnings("unchecked")
+            Map<String, ScheduledFuture<?>> timers = (Map<String, ScheduledFuture<?>>) timersField.get(boardService);
+            timers.put(gameId, scheduledFuture);
+        } catch (Exception e) {
+            fail("Error accessing gameTimers field: " + e.getMessage());
+        }
+        
+        boardService.startGameTimer(gameId, 60);
+        
+        verify(taskScheduler, never()).scheduleAtFixedRate(any(Runnable.class), any(Duration.class));
+    }
+
+    @SuppressWarnings({ "unchecked", "rawtypes" })
+    @Test
+    void startGameTimer_CountdownDecrementsCorrectly() {
+        ArgumentCaptor<Runnable> runnableCaptor = ArgumentCaptor.forClass(Runnable.class);
+        when(taskScheduler.scheduleAtFixedRate(runnableCaptor.capture(), any(Duration.class)))
+            .thenReturn((ScheduledFuture) scheduledFuture);
+        
+        boardService.startGameTimer(gameId, 3);
+        
+        Runnable scheduledTask = runnableCaptor.getValue();
+        
+        Map<String, Object> expectedMessage = new HashMap<>();
+        expectedMessage.put("timeLeft", 2);
+        
+        scheduledTask.run();
+        verify(messagingTemplate).convertAndSend(eq("/topic/board." + gameId), eq(expectedMessage));
+        
+        expectedMessage.put("timeLeft", 1);
+        scheduledTask.run();
+        verify(messagingTemplate).convertAndSend(eq("/topic/board." + gameId), eq(expectedMessage));
+    }
+
+    @SuppressWarnings({ "unchecked", "rawtypes" })
+    @Test
+    void startGameTimer_ReachesZero_EndsGame() {
+        when(boardTopic.getTopic()).thenReturn("/topic/board");
+        
+        ArgumentCaptor<Runnable> runnableCaptor = ArgumentCaptor.forClass(Runnable.class);
+        when(taskScheduler.scheduleAtFixedRate(runnableCaptor.capture(), any(Duration.class)))
+            .thenReturn((ScheduledFuture) scheduledFuture);
+        
+        when(redisTemplate.opsForValue()).thenReturn(valueOperations);
+        
+        Board mockBoard = new Board(gameId, playerColors);
+        when(valueOperations.get(boardKey)).thenReturn(mockBoard);
+        
+        boardService.startGameTimer(gameId, 0);
+        
+        Runnable scheduledTask = runnableCaptor.getValue();
+        scheduledTask.run();
+        
+        verify(messagingTemplate).convertAndSend(eq("/topic/board." + gameId), any(Map.class));
+        verify(scheduledFuture).cancel(true);
+    }
+
+    @SuppressWarnings({ "unchecked", "rawtypes" })
+    @Test
+    void startGameTimer_RemovesBoardAfterGameEnd() {
+        when(boardTopic.getTopic()).thenReturn("/topic/board");
+        
+        ArgumentCaptor<Runnable> runnableCaptor = ArgumentCaptor.forClass(Runnable.class);
+        when(taskScheduler.scheduleAtFixedRate(runnableCaptor.capture(), any(Duration.class)))
+            .thenReturn((ScheduledFuture) scheduledFuture);
+        
+        when(redisTemplate.opsForValue()).thenReturn(valueOperations);
+        
+        Board mockBoard = new Board(gameId, playerColors);
+        when(valueOperations.get(boardKey)).thenReturn(mockBoard);
+        
+        boardService.startGameTimer(gameId, 0);
+        
+        Runnable scheduledTask = runnableCaptor.getValue();
+        scheduledTask.run();
+        
+        verify(redisTemplate).delete(boardKey);
+    }
     
-
-
+    @Test
+    void endGame_Success() {
+        when(boardTopic.getTopic()).thenReturn("/topic/board");
+        when(redisTemplate.opsForValue()).thenReturn(valueOperations);
+        
+        Board mockBoard = new Board(gameId, playerColors);
+        when(valueOperations.get(boardKey)).thenReturn(mockBoard);
+        
+        boardService.endGame(gameId);
+        
+        verify(messagingTemplate).convertAndSend(eq("/topic/board." + gameId), any(Map.class));
+        verify(redisTemplate).convertAndSend(eq("/topic/board"), any(Map.class));
+        verify(redisTemplate).delete(boardKey);
+    }
 }
