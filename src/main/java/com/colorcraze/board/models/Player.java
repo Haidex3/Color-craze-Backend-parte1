@@ -46,4 +46,13 @@ public class Player extends Box{
             col = -1;}
     }}
 
+    public Player() {
+        super(ColorStatus.WHITE);
+        this.id = UUID.randomUUID();
+        this.col = 0;
+        this.row = 0;
+        this.score = 0;
+        this.isUp = false;
+    }
+
 }

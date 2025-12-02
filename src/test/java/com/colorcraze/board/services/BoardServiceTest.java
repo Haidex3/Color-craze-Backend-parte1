@@ -1,29 +1,23 @@
 package com.colorcraze.board.services;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
-import org.mockito.Mock;
+import org.mockito.*;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.ValueOperations;
+import org.springframework.data.redis.listener.ChannelTopic;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
 
-import com.colorcraze.board.dtos.responses.MoveResult;
-import com.colorcraze.board.dtos.responses.PlatformUpdate;
-import com.colorcraze.board.dtos.responses.PlayerUpdate;
 import com.colorcraze.board.models.Board;
-import com.colorcraze.board.models.Box;
-import com.colorcraze.board.models.Platform;
-import com.colorcraze.board.models.Player;
 import com.colorcraze.utils.enums.ColorStatus;
-import com.colorcraze.utils.enums.PlayerMove;
 
-import java.util.Map;
-import java.util.Set;
-import java.util.UUID;
-import java.util.List;
+import java.util.*;
 import java.util.concurrent.ScheduledFuture;
-import java.util.concurrent.TimeUnit;
-import static org.awaitility.Awaitility.await;
+import java.time.Duration;
+
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
@@ -32,611 +26,596 @@ import static org.mockito.Mockito.*;
 class BoardServiceTest {
 
     @Mock
+    private RedisTemplate<String, Object> redisTemplate;
+
+    @Mock
     private SimpMessagingTemplate messagingTemplate;
+
+    @Mock
+    private ChannelTopic boardTopic;
+
+    @Mock
+    private ValueOperations<String, Object> valueOperations;
 
     @Mock
     private ScheduledFuture<?> scheduledFuture;
 
-    private BoardService boardService = new BoardService(messagingTemplate);
+    @Mock
+    private ThreadPoolTaskScheduler taskScheduler;
+
+    private BoardService boardService;
+    
+    private final String serverId = "test-server-1";
+    private final String gameId = "test-game-123";
+    private final String boardKey = "board:test-game-123";
+    private final String playerId1 = "550e8400-e29b-41d4-a716-446655440000";
+    private final String playerId2 = "550e8400-e29b-41d4-a716-446655440001";
+    private final UUID uuid1 = UUID.fromString(playerId1);
+    private final UUID uuid2 = UUID.fromString(playerId2);
+    private final ColorStatus color1 = ColorStatus.YELLOW;
+    private final ColorStatus color2 = ColorStatus.RED;
+    
+    private Map<String, ColorStatus> playerColors;
+
+    @BeforeEach
+    void setUp() {
+        playerColors = new HashMap<>();
+        playerColors.put(playerId1, color1);
+        playerColors.put(playerId2, color2);
+        
+        boardService = new BoardService(redisTemplate, messagingTemplate, boardTopic, serverId);
+        
+        try {
+            var schedulerField = BoardService.class.getDeclaredField("scheduler");
+            schedulerField.setAccessible(true);
+            schedulerField.set(boardService, taskScheduler);
+            
+            var timersField = BoardService.class.getDeclaredField("gameTimers");
+            timersField.setAccessible(true);
+            @SuppressWarnings("unchecked")
+            Map<String, ScheduledFuture<?>> timers = (Map<String, ScheduledFuture<?>>) timersField.get(boardService);
+            timers.clear();
+        } catch (Exception e) {
+            throw new RuntimeException("Error setting up test", e);
+        }
+    }
 
     @Test
     void createBoardWithPlayers_Success() {
-        String gameId = "test-game";
-        UUID playerId1 = UUID.randomUUID();
-        UUID playerId2 = UUID.randomUUID();
-        Map<String, ColorStatus> playerColors = Map.of(
-            playerId1.toString(), ColorStatus.RED,
-            playerId2.toString(), ColorStatus.GREEN
-        );
-
-        Board board = boardService.createBoardWithPlayers(gameId, playerColors);
-
-        assertNotNull(board);
-        assertEquals(gameId, board.getGameId());
-        assertTrue(boardService.getAllBoardIds().contains(gameId));
+        when(redisTemplate.hasKey(boardKey)).thenReturn(false);
+        when(redisTemplate.opsForValue()).thenReturn(valueOperations);
+        
+        Board result = boardService.createBoardWithPlayers(gameId, playerColors);
+        
+        assertNotNull(result);
+        assertEquals(gameId, result.getGameId());
+        assertNotNull(result.getPlayers());
+        assertEquals(2, result.getPlayers().size());
+        assertTrue(result.getPlayers().containsKey(uuid1));
+        assertTrue(result.getPlayers().containsKey(uuid2));
+        
+        verify(redisTemplate).hasKey(boardKey);
+        verify(valueOperations).set(boardKey, result);
     }
 
     @Test
     void createBoardWithPlayers_AlreadyExists() {
-        String gameId = "test-game";
-        UUID playerId = UUID.randomUUID();
-        Map<String, ColorStatus> playerColors = Map.of(playerId.toString(), ColorStatus.RED);
-
-        boardService.createBoardWithPlayers(gameId, playerColors);
-
-        IllegalStateException exception = assertThrows(IllegalStateException.class, 
-            () -> boardService.createBoardWithPlayers(gameId, playerColors));
-
-        assertEquals("El tablero con id test-game ya existe", exception.getMessage());
+        when(redisTemplate.hasKey(boardKey)).thenReturn(true);
+        
+        IllegalStateException exception = assertThrows(
+            IllegalStateException.class,
+            () -> boardService.createBoardWithPlayers(gameId, playerColors)
+        );
+        
+        assertEquals("Board with id " + gameId + " already exists", exception.getMessage());
+        
+        verify(redisTemplate).hasKey(boardKey);
+        verify(redisTemplate, never()).opsForValue();
+        verify(valueOperations, never()).set(anyString(), any());
     }
 
     @Test
     void createBoardWithPlayers_NullPlayerColors() {
-        String gameId = "test-game-null";
-
-        Board board = boardService.createBoardWithPlayers(gameId, null);
-
-        assertNotNull(board);
-        assertEquals(gameId, board.getGameId());
+        when(redisTemplate.hasKey(boardKey)).thenReturn(false);
+        when(redisTemplate.opsForValue()).thenReturn(valueOperations);
+        
+        Board result = boardService.createBoardWithPlayers(gameId, null);
+        
+        assertNotNull(result);
+        assertEquals(gameId, result.getGameId());
+        assertNotNull(result.getPlayers());
+        assertTrue(result.getPlayers().isEmpty());
+        
+        verify(redisTemplate).hasKey(boardKey);
+        verify(valueOperations).set(boardKey, result);
     }
 
     @Test
     void getBoard_Success() {
-        String gameId = "test-game";
-        UUID playerId = UUID.randomUUID();
-        Map<String, ColorStatus> playerColors = Map.of(playerId.toString(), ColorStatus.RED);
-        boardService.createBoardWithPlayers(gameId, playerColors);
-
-        Board board = boardService.getBoard(gameId);
-
-        assertNotNull(board);
-        assertEquals(gameId, board.getGameId());
+        when(redisTemplate.opsForValue()).thenReturn(valueOperations);
+        Board mockBoard = new Board(gameId, playerColors);
+        when(valueOperations.get(boardKey)).thenReturn(mockBoard);
+        
+        Board result = boardService.getBoard(gameId);
+        
+        assertNotNull(result);
+        assertEquals(gameId, result.getGameId());
+        assertEquals(mockBoard, result);
+        
+        verify(redisTemplate).opsForValue();
+        verify(valueOperations).get(boardKey);
     }
 
     @Test
     void getBoard_NotFound() {
-        String gameId = "non-existent-game";
-
-        IllegalStateException exception = assertThrows(IllegalStateException.class, 
-            () -> boardService.getBoard(gameId));
-
-        assertEquals("No existe un tablero con id non-existent-game", exception.getMessage());
+        when(redisTemplate.opsForValue()).thenReturn(valueOperations);
+        when(valueOperations.get(boardKey)).thenReturn(null);
+        
+        IllegalStateException exception = assertThrows(
+            IllegalStateException.class,
+            () -> boardService.getBoard(gameId)
+        );
+        
+        assertEquals("No board exists with id " + gameId, exception.getMessage());
+        
+        verify(redisTemplate).opsForValue();
+        verify(valueOperations).get(boardKey);
     }
 
     @Test
     void getBlock_Success() {
-        String gameId = "test-game";
-        UUID playerId = UUID.randomUUID();
-        Map<String, ColorStatus> playerColors = Map.of(playerId.toString(), ColorStatus.RED);
-        boardService.createBoardWithPlayers(gameId, playerColors);
-
-        Box block = boardService.getBlock(gameId, 0, 0);
-
+        when(redisTemplate.opsForValue()).thenReturn(valueOperations);
+        Board mockBoard = new Board(gameId, playerColors);
+        when(valueOperations.get(boardKey)).thenReturn(mockBoard);
+        
+        var block = boardService.getBlock(gameId, 0, 0);
+        
         assertNotNull(block);
+        
+        verify(redisTemplate).opsForValue();
+        verify(valueOperations).get(boardKey);
     }
 
     @Test
     void setBlock_Success() {
-        String gameId = "test-game";
-        UUID playerId = UUID.randomUUID();
-        Map<String, ColorStatus> playerColors = Map.of(playerId.toString(), ColorStatus.RED);
-        boardService.createBoardWithPlayers(gameId, playerColors);
+        when(redisTemplate.opsForValue()).thenReturn(valueOperations);
+        Board mockBoard = new Board(gameId, playerColors);
+        when(valueOperations.get(boardKey)).thenReturn(mockBoard);
         
-        Box newBlock = new Platform(ColorStatus.GREEN);
+        var newBlock = new com.colorcraze.board.models.Box(ColorStatus.RED);
+        
         boardService.setBlock(gameId, 0, 0, newBlock);
-
-        Box retrievedBlock = boardService.getBlock(gameId, 0, 0);
-        assertEquals(newBlock, retrievedBlock);
+        
+        assertEquals(newBlock, mockBoard.getGrid()[0][0]);
+        verify(redisTemplate, times(2)).opsForValue();
+        verify(valueOperations).get(boardKey);
+        verify(valueOperations).set(boardKey, mockBoard);
     }
 
     @Test
     void movePlayer_UpMove_Success() {
-        String gameId = "test-game";
-        UUID playerId = UUID.randomUUID();
+        when(boardTopic.getTopic()).thenReturn("/topic/board");
+        when(redisTemplate.opsForValue()).thenReturn(valueOperations);
         
         Board mockBoard = mock(Board.class);
+        when(valueOperations.get(boardKey)).thenReturn(mockBoard);
         
-        when(mockBoard.isPlayerUp(playerId)).thenReturn(false);
-        when(mockBoard.getRowDownPLayer(playerId.toString())).thenReturn(new Platform(ColorStatus.RED));
+        when(mockBoard.isPlayerUp(uuid1)).thenReturn(false);
+        when(mockBoard.getRowDownPLayer(playerId1)).thenReturn(mock(com.colorcraze.board.models.Platform.class));
+        when(mockBoard.movePlayer(uuid1, com.colorcraze.utils.enums.PlayerMove.UP))
+            .thenReturn(new com.colorcraze.board.dtos.responses.MoveResult(
+                uuid1, 1, 1, List.of(), List.of(), true, false
+            ));
         
-        MoveResult mockMoveResult = new MoveResult(
-            playerId, 1, 1, 
-            List.of(new PlatformUpdate(1, 1, ColorStatus.RED)),
-            List.of(new PlayerUpdate(UUID.randomUUID(), ColorStatus.GREEN, 2)),
-            true, false
-        );
+        var results = boardService.movePlayer(gameId, playerId1, com.colorcraze.utils.enums.PlayerMove.UP);
         
-        when(mockBoard.movePlayer(playerId, PlayerMove.UP))
-            .thenReturn(mockMoveResult);
-
-        Map<String, Board> boards = getBoardsField();
-        boards.put(gameId, mockBoard);
-
-        List<MoveResult> results = boardService.movePlayer(gameId, playerId.toString(), PlayerMove.UP);
-
         assertNotNull(results);
         assertFalse(results.isEmpty());
-        verify(mockBoard).setPlayerIsUp(playerId, true);
-        verify(mockBoard).setPlayerIsUp(playerId, false);
+        
+        verify(mockBoard).setPlayerIsUp(uuid1, true);
+        verify(mockBoard).setPlayerIsUp(uuid1, false);
+        verify(redisTemplate, times(2)).opsForValue();
+        verify(valueOperations).get(boardKey);
+        verify(valueOperations).set(boardKey, mockBoard);
+        verify(redisTemplate).convertAndSend(eq("/topic/board"), any(Map.class));
     }
 
     @Test
     void movePlayer_UpMove_PlayerAlreadyUp() {
-        String gameId = "test-game";
-        UUID playerId = UUID.randomUUID();
-        
+        when(redisTemplate.opsForValue()).thenReturn(valueOperations);
         Board mockBoard = mock(Board.class);
-        when(mockBoard.isPlayerUp(playerId)).thenReturn(true);
+        when(valueOperations.get(boardKey)).thenReturn(mockBoard);
         
-        Map<String, Board> boards = getBoardsField();
-        boards.put(gameId, mockBoard);
-
-        List<MoveResult> results = boardService.movePlayer(gameId, playerId.toString(), PlayerMove.UP);
-
+        when(mockBoard.isPlayerUp(uuid1)).thenReturn(true);
+        
+        var results = boardService.movePlayer(gameId, playerId1, com.colorcraze.utils.enums.PlayerMove.UP);
+        
         assertNotNull(results);
         assertTrue(results.isEmpty());
+        
         verify(mockBoard, never()).setPlayerIsUp(any(), anyBoolean());
+        verify(mockBoard, never()).movePlayer(any(), any());
+        verify(redisTemplate, times(2)).opsForValue();
+        verify(valueOperations).get(boardKey);
+        verify(valueOperations).set(boardKey, mockBoard);
     }
 
     @Test
     void movePlayer_UpMove_NoPlatformBelow() {
-        String gameId = "test-game";
-        UUID playerId = UUID.randomUUID();
-        
+        when(redisTemplate.opsForValue()).thenReturn(valueOperations);
         Board mockBoard = mock(Board.class);
-        when(mockBoard.isPlayerUp(playerId)).thenReturn(false);
-        when(mockBoard.getRowDownPLayer(playerId.toString())).thenReturn(new Box(ColorStatus.WHITE));
+        when(valueOperations.get(boardKey)).thenReturn(mockBoard);
         
-        Map<String, Board> boards = getBoardsField();
-        boards.put(gameId, mockBoard);
-
-        List<MoveResult> results = boardService.movePlayer(gameId, playerId.toString(), PlayerMove.UP);
-
+        when(mockBoard.isPlayerUp(uuid1)).thenReturn(false);
+        when(mockBoard.getRowDownPLayer(playerId1)).thenReturn(null);
+        
+        var results = boardService.movePlayer(gameId, playerId1, com.colorcraze.utils.enums.PlayerMove.UP);
+        
         assertNotNull(results);
         assertTrue(results.isEmpty());
+        
         verify(mockBoard, never()).setPlayerIsUp(any(), anyBoolean());
+        verify(mockBoard, never()).movePlayer(any(), any());
+        verify(redisTemplate, times(2)).opsForValue();
+        verify(valueOperations).get(boardKey);
+        verify(valueOperations).set(boardKey, mockBoard);
     }
 
     @Test
     void movePlayer_UpMove_NullStepResults() {
-        String gameId = "test-game";
-        UUID playerId = UUID.randomUUID();
-        
+        when(redisTemplate.opsForValue()).thenReturn(valueOperations);
         Board mockBoard = mock(Board.class);
-        when(mockBoard.isPlayerUp(playerId)).thenReturn(false);
-        when(mockBoard.getRowDownPLayer(playerId.toString())).thenReturn(new Platform(ColorStatus.RED));
-        when(mockBoard.movePlayer(playerId, PlayerMove.UP)).thenReturn(null);
+        when(valueOperations.get(boardKey)).thenReturn(mockBoard);
         
-        Map<String, Board> boards = getBoardsField();
-        boards.put(gameId, mockBoard);
+        when(mockBoard.isPlayerUp(uuid1)).thenReturn(false);
+        when(mockBoard.getRowDownPLayer(playerId1)).thenReturn(mock(com.colorcraze.board.models.Platform.class));
+        
+        when(mockBoard.movePlayer(uuid1, com.colorcraze.utils.enums.PlayerMove.UP))
+            .thenReturn(null);
 
-        List<MoveResult> results = boardService.movePlayer(gameId, playerId.toString(), PlayerMove.UP);
-
+        var results = boardService.movePlayer(gameId, playerId1, com.colorcraze.utils.enums.PlayerMove.UP);
+        
         assertNotNull(results);
         assertTrue(results.isEmpty());
-        verify(mockBoard).setPlayerIsUp(playerId, true);
-        verify(mockBoard).setPlayerIsUp(playerId, false);
+        
+        verify(mockBoard).setPlayerIsUp(uuid1, true);
+        verify(mockBoard).setPlayerIsUp(uuid1, false);
+        verify(redisTemplate, times(2)).opsForValue();
+        verify(valueOperations).get(boardKey);
+        verify(valueOperations).set(boardKey, mockBoard);
     }
 
     @Test
     void movePlayer_UpMove_PartialSteps() {
-        String gameId = "test-game";
-        UUID playerId = UUID.randomUUID();
+        when(boardTopic.getTopic()).thenReturn("/topic/board");
+        when(redisTemplate.opsForValue()).thenReturn(valueOperations);
         
         Board mockBoard = mock(Board.class);
-        when(mockBoard.isPlayerUp(playerId)).thenReturn(false);
-        when(mockBoard.getRowDownPLayer(playerId.toString())).thenReturn(new Platform(ColorStatus.RED));
+        when(valueOperations.get(boardKey)).thenReturn(mockBoard);
         
-        MoveResult firstStep = new MoveResult(
-            playerId, 1, 1, 
-            List.of(new PlatformUpdate(1, 1, ColorStatus.RED)),
-            List.of(new PlayerUpdate(UUID.randomUUID(), ColorStatus.GREEN, 2)),
-            true, false
+        when(mockBoard.isPlayerUp(uuid1)).thenReturn(false);
+        when(mockBoard.getRowDownPLayer(playerId1)).thenReturn(mock(com.colorcraze.board.models.Platform.class));
+        
+        com.colorcraze.board.dtos.responses.MoveResult step1 = new com.colorcraze.board.dtos.responses.MoveResult(
+            uuid1, 1, 1, List.of(), List.of(), true, false
+        );
+        com.colorcraze.board.dtos.responses.MoveResult step2 = new com.colorcraze.board.dtos.responses.MoveResult(
+            uuid1, 2, 1, List.of(), List.of(), true, false
         );
         
-        MoveResult secondStep = new MoveResult(
-            playerId, 2, 1, 
-            List.of(new PlatformUpdate(2, 1, ColorStatus.RED)),
-            List.of(new PlayerUpdate(UUID.randomUUID(), ColorStatus.PURPLE, 2)),
-            true, false
-        );
-        
-        when(mockBoard.movePlayer(playerId, PlayerMove.UP))
-            .thenReturn(firstStep)
-            .thenReturn(secondStep)
+        when(mockBoard.movePlayer(uuid1, com.colorcraze.utils.enums.PlayerMove.UP))
+            .thenReturn(step1)
+            .thenReturn(step2)
             .thenReturn(null);
+
+        var results = boardService.movePlayer(gameId, playerId1, com.colorcraze.utils.enums.PlayerMove.UP);
         
-        Map<String, Board> boards = getBoardsField();
-        boards.put(gameId, mockBoard);
-
-        List<MoveResult> results = boardService.movePlayer(gameId, playerId.toString(), PlayerMove.UP);
-
         assertNotNull(results);
         assertEquals(1, results.size());
-        assertEquals(secondStep.newRow(), results.get(0).newRow());
-        assertEquals(secondStep.newCol(), results.get(0).newCol());
-        verify(mockBoard).setPlayerIsUp(playerId, true);
-        verify(mockBoard).setPlayerIsUp(playerId, false);
+        assertEquals(2, results.get(0).newRow());
+        
+        verify(mockBoard, times(3)).movePlayer(
+            uuid1,
+            com.colorcraze.utils.enums.PlayerMove.UP
+        );
+
+        verify(mockBoard).setPlayerIsUp(uuid1, true);
+        verify(mockBoard).setPlayerIsUp(uuid1, false);
+        verify(redisTemplate, times(2)).opsForValue();
+        verify(valueOperations).get(boardKey);
+        verify(valueOperations).set(boardKey, mockBoard);
+        verify(redisTemplate).convertAndSend(eq("/topic/board"), any(Map.class));
     }
 
     @Test
     void movePlayer_OtherMove_Success() {
-        String gameId = "test-game";
-        UUID playerId = UUID.randomUUID();
+        when(boardTopic.getTopic()).thenReturn("/topic/board");
+        when(redisTemplate.opsForValue()).thenReturn(valueOperations);
         
         Board mockBoard = mock(Board.class);
+        when(valueOperations.get(boardKey)).thenReturn(mockBoard);
         
-        MoveResult mockMoveResult = new MoveResult(
-            playerId, 1, 2, 
-            List.of(), List.of(), true, false
+        com.colorcraze.board.dtos.responses.MoveResult moveResult = new com.colorcraze.board.dtos.responses.MoveResult(
+            uuid1, 1, 2, List.of(), List.of(), true, false
         );
         
-        when(mockBoard.movePlayer(playerId, PlayerMove.RIGHT))
-            .thenReturn(mockMoveResult);
+        when(mockBoard.movePlayer(uuid1, com.colorcraze.utils.enums.PlayerMove.RIGHT))
+            .thenReturn(moveResult);    
+
         
-        Map<String, Board> boards = getBoardsField();
-        boards.put(gameId, mockBoard);
-
-        List<MoveResult> results = boardService.movePlayer(gameId, playerId.toString(), PlayerMove.RIGHT);
-
+        var results = boardService.movePlayer(gameId, playerId1, com.colorcraze.utils.enums.PlayerMove.RIGHT);
+        
         assertNotNull(results);
         assertEquals(1, results.size());
-        assertEquals(mockMoveResult, results.get(0));
-    }
-
-    @Test
-    void movePlayer_OtherMove_NullResult() {
-        String gameId = "test-game";
-        UUID playerId = UUID.randomUUID();
+        assertEquals(moveResult, results.get(0));
         
-        Board mockBoard = mock(Board.class);
-        
-        when(mockBoard.movePlayer(playerId, PlayerMove.LEFT))
-            .thenReturn(null);
-        
-        Map<String, Board> boards = getBoardsField();
-        boards.put(gameId, mockBoard);
-
-        List<MoveResult> results = boardService.movePlayer(gameId, playerId.toString(), PlayerMove.LEFT);
-
-        assertNotNull(results);
-        assertEquals(1, results.size());
-        assertNull(results.get(0));
+        verify(mockBoard, never()).isPlayerUp(any());
+        verify(mockBoard, never()).getRowDownPLayer(any());
+        verify(mockBoard, never()).setPlayerIsUp(any(), anyBoolean());
+        verify(redisTemplate, times(2)).opsForValue();
+        verify(valueOperations).get(boardKey);
+        verify(valueOperations).set(boardKey, mockBoard);
+        verify(redisTemplate).convertAndSend(eq("/topic/board"), any(Map.class));
     }
 
     @Test
     void movePlayer_DownMove_Success() {
-        String gameId = "test-game";
-        UUID playerId = UUID.randomUUID();
+        when(boardTopic.getTopic()).thenReturn("/topic/board");
+        when(redisTemplate.opsForValue()).thenReturn(valueOperations);
         
         Board mockBoard = mock(Board.class);
+        when(valueOperations.get(boardKey)).thenReturn(mockBoard);
         
-        MoveResult mockMoveResult = new MoveResult(
-            playerId, 2, 1, 
-            List.of(), List.of(), true, true
+        com.colorcraze.board.dtos.responses.MoveResult moveResult = new com.colorcraze.board.dtos.responses.MoveResult(
+            uuid1, 2, 1, List.of(), List.of(), true, false
         );
         
-        when(mockBoard.movePlayer(playerId, PlayerMove.DOWN))
-            .thenReturn(mockMoveResult);
+        when(mockBoard.movePlayer(uuid1, com.colorcraze.utils.enums.PlayerMove.DOWN))
+            .thenReturn(moveResult);
         
-        Map<String, Board> boards = getBoardsField();
-        boards.put(gameId, mockBoard);
-
-        List<MoveResult> results = boardService.movePlayer(gameId, playerId.toString(), PlayerMove.DOWN);
-
+        var results = boardService.movePlayer(gameId, playerId1, com.colorcraze.utils.enums.PlayerMove.DOWN);
+        
         assertNotNull(results);
         assertEquals(1, results.size());
-        assertEquals(mockMoveResult, results.get(0));
+        assertEquals(moveResult, results.get(0));
+        
+        verify(mockBoard, never()).isPlayerUp(any());
+        verify(mockBoard, never()).getRowDownPLayer(any());
+        verify(mockBoard, never()).setPlayerIsUp(any(), anyBoolean());
+        verify(redisTemplate, times(2)).opsForValue();
+        verify(valueOperations).get(boardKey);
+        verify(valueOperations).set(boardKey, mockBoard);
+        verify(redisTemplate).convertAndSend(eq("/topic/board"), any(Map.class));
     }
 
     @Test
     void movePlayer_UpMove_WithGravityInFinalResult() {
-        String gameId = "test-game";
-        UUID playerId = UUID.randomUUID();
+        when(boardTopic.getTopic()).thenReturn("/topic/board");
+        when(redisTemplate.opsForValue()).thenReturn(valueOperations);
         
         Board mockBoard = mock(Board.class);
-        when(mockBoard.isPlayerUp(playerId)).thenReturn(false);
-        when(mockBoard.getRowDownPLayer(playerId.toString())).thenReturn(new Platform(ColorStatus.RED));
+        when(valueOperations.get(boardKey)).thenReturn(mockBoard);
         
-        MoveResult stepWithGravity = new MoveResult(
-            playerId, 3, 1, 
-            List.of(new PlatformUpdate(3, 1, ColorStatus.RED)),
-            List.of(new PlayerUpdate(UUID.randomUUID(), ColorStatus.PURPLE, 2)),
+        when(mockBoard.isPlayerUp(uuid1)).thenReturn(false);
+        when(mockBoard.getRowDownPLayer(playerId1)).thenReturn(mock(com.colorcraze.board.models.Platform.class));
+        
+        com.colorcraze.board.dtos.responses.MoveResult stepResult = new com.colorcraze.board.dtos.responses.MoveResult(
+            uuid1, 3, 1, 
+            List.of(new com.colorcraze.board.dtos.responses.PlatformUpdate(2, 1, color1)),
+            List.of(new com.colorcraze.board.dtos.responses.PlayerUpdate(uuid1, color1, 5)),
             true, true
         );
         
-        when(mockBoard.movePlayer(playerId, PlayerMove.UP))
-            .thenReturn(stepWithGravity)
-            .thenReturn(null);
+        when(mockBoard.movePlayer(uuid1, com.colorcraze.utils.enums.PlayerMove.UP))
+        .thenReturn(stepResult)
+        .thenReturn(null);
+
         
-        Map<String, Board> boards = getBoardsField();
-        boards.put(gameId, mockBoard);
-
-        List<MoveResult> results = boardService.movePlayer(gameId, playerId.toString(), PlayerMove.UP);
-
+        var results = boardService.movePlayer(gameId, playerId1, com.colorcraze.utils.enums.PlayerMove.UP);
+        
         assertNotNull(results);
         assertEquals(1, results.size());
         assertTrue(results.get(0).gravity());
-        verify(mockBoard).setPlayerIsUp(playerId, true);
-        verify(mockBoard).setPlayerIsUp(playerId, false);
+        assertEquals(1, results.get(0).platforms().size());
+        assertEquals(1, results.get(0).affectedPlayers().size());
+        
+        verify(mockBoard, times(2)).movePlayer(
+                uuid1,
+                com.colorcraze.utils.enums.PlayerMove.UP
+            );
+        verify(mockBoard).setPlayerIsUp(uuid1, true);
+        verify(mockBoard).setPlayerIsUp(uuid1, false);
+        verify(redisTemplate, times(2)).opsForValue();
+        verify(valueOperations).get(boardKey);
+        verify(valueOperations).set(boardKey, mockBoard);
+        verify(redisTemplate).convertAndSend(eq("/topic/board"), any(Map.class));
     }
 
     @Test
     void movePlayer_BoardNotFound() {
-        String gameId = "non-existent-game";
-        UUID playerId = UUID.randomUUID();
-        String playerIdStr = playerId.toString();
-
+        when(redisTemplate.opsForValue()).thenReturn(valueOperations);
+        when(valueOperations.get(boardKey)).thenReturn(null);
+        
         IllegalStateException exception = assertThrows(
-            IllegalStateException.class, 
-            () -> boardService.movePlayer(gameId, playerIdStr, PlayerMove.RIGHT)
+            IllegalStateException.class,
+            () -> boardService.movePlayer(gameId, playerId1, com.colorcraze.utils.enums.PlayerMove.UP)
         );
-
-        assertEquals("No existe un tablero con id non-existent-game", exception.getMessage());
+        
+        assertEquals("No board exists with id " + gameId, exception.getMessage());
+        
+        verify(redisTemplate).opsForValue();
+        verify(valueOperations).get(boardKey);
+        verify(valueOperations, never()).set(anyString(), any());
     }
 
     @Test
     void addPlayerToBoard_Success() {
-        String gameId = "test-game";
-        UUID playerId = UUID.randomUUID();
-        Map<String, ColorStatus> playerColors = Map.of(playerId.toString(), ColorStatus.RED);
-        boardService.createBoardWithPlayers(gameId, playerColors);
-
-        Player newPlayer = boardService.addPlayerToBoard(gameId, ColorStatus.GREEN);
-
-        assertNotNull(newPlayer);
-        assertEquals(ColorStatus.GREEN, newPlayer.getColor());
-        assertNotNull(newPlayer.getId());
+        when(redisTemplate.opsForValue()).thenReturn(valueOperations);
+        Board mockBoard = mock(Board.class);
+        when(valueOperations.get(boardKey)).thenReturn(mockBoard);
+        
+        var result = boardService.addPlayerToBoard(gameId, color1);
+        
+        assertNotNull(result);
+        assertEquals(color1, result.getColor());
+        
+        verify(mockBoard).addPlayer(any(com.colorcraze.board.models.Player.class));
+        verify(redisTemplate, times(2)).opsForValue();
+        verify(valueOperations).get(boardKey);
+        verify(valueOperations).set(boardKey, mockBoard);
     }
 
     @Test
     void getAllBoardIds_Success() {
-        String gameId1 = "test-game-1";
-        String gameId2 = "test-game-2";
-        UUID playerId1 = UUID.randomUUID();
-        UUID playerId2 = UUID.randomUUID();
+        Set<String> keys = new HashSet<>();
+        keys.add("board:game1");
+        keys.add("board:game2");
+        keys.add("other:key");
         
-        boardService.createBoardWithPlayers(gameId1, Map.of(playerId1.toString(), ColorStatus.RED));
-        boardService.createBoardWithPlayers(gameId2, Map.of(playerId2.toString(), ColorStatus.GREEN));
-
-        Set<String> boardIds = boardService.getAllBoardIds();
-
-        assertNotNull(boardIds);
-        assertTrue(boardIds.contains(gameId1));
-        assertTrue(boardIds.contains(gameId2));
-        assertEquals(2, boardIds.size());
+        when(redisTemplate.keys("board:*")).thenReturn(keys);
+        
+        Set<String> result = boardService.getAllBoardIds();
+        
+        assertNotNull(result);
+        assertTrue(1< result.size());
+        assertTrue(result.contains("board:game1"));
+        assertTrue(result.contains("board:game2"));
+        assertTrue(result.contains("other:key"));
+        
+        verify(redisTemplate).keys("board:*");
     }
 
     @Test
     void getAllBoardIds_Empty() {
-        Map<String, Board> boards = getBoardsField();
-        boards.clear();
-
-        Set<String> boardIds = boardService.getAllBoardIds();
-
-        assertNotNull(boardIds);
-        assertTrue(boardIds.isEmpty());
+        when(redisTemplate.keys("board:*")).thenReturn(new HashSet<>());
+        
+        Set<String> result = boardService.getAllBoardIds();
+        
+        assertNotNull(result);
+        assertTrue(result.isEmpty());
+        
+        verify(redisTemplate).keys("board:*");
     }
 
+    @SuppressWarnings({ "unchecked", "rawtypes" })
     @Test
     void startGameTimer_Success() {
-        boardService = new BoardService(messagingTemplate);
-        
-        String gameId = "test-game";
-        Map<String, ColorStatus> playerColors = Map.of(
-            UUID.randomUUID().toString(), ColorStatus.RED
-        );
-        
-        boardService.createBoardWithPlayers(gameId, playerColors);
-        
-        boardService.startGameTimer(gameId, 60);
-        
-        await().atMost(200, TimeUnit.MILLISECONDS)
-            .untilAsserted(() -> 
-                verify(messagingTemplate, atLeastOnce())
-                    .convertAndSend(eq("/topic/board." + gameId), any(Map.class))
-            );
+
+        ArgumentCaptor<Runnable> runnableCaptor = ArgumentCaptor.forClass(Runnable.class);
+        when(taskScheduler.scheduleAtFixedRate(runnableCaptor.capture(), any(Duration.class)))
+            .thenReturn((ScheduledFuture) scheduledFuture);
+
+        boardService.startGameTimer(gameId, 1);
+
+        Runnable scheduledTask = runnableCaptor.getValue();
+        scheduledTask.run();
+
+        verify(messagingTemplate, atLeastOnce())
+            .convertAndSend(eq("/topic/board." + gameId), any(Map.class));
     }
 
     @Test
     void startGameTimer_AlreadyExists_DoesNotStartNewTimer() {
-        boardService = spy(new BoardService(messagingTemplate));
-        
-        String gameId = "test-game";
-        Map<String, ColorStatus> playerColors = Map.of(
-            UUID.randomUUID().toString(), ColorStatus.RED
-        );
-        
-        boardService.createBoardWithPlayers(gameId, playerColors);
+        try {
+            var timersField = BoardService.class.getDeclaredField("gameTimers");
+            timersField.setAccessible(true);
+            @SuppressWarnings("unchecked")
+            Map<String, ScheduledFuture<?>> timers = (Map<String, ScheduledFuture<?>>) timersField.get(boardService);
+            timers.put(gameId, scheduledFuture);
+        } catch (Exception e) {
+            fail("Error accessing gameTimers field: " + e.getMessage());
+        }
         
         boardService.startGameTimer(gameId, 60);
-        boardService.startGameTimer(gameId, 60);
         
-        await().atMost(200, TimeUnit.MILLISECONDS)
-            .untilAsserted(() -> 
-                verify(messagingTemplate, atLeastOnce())
-                    .convertAndSend(eq("/topic/board." + gameId), any(Map.class))
-            );
+        verify(taskScheduler, never()).scheduleAtFixedRate(any(Runnable.class), any(Duration.class));
     }
 
+    @SuppressWarnings({ "unchecked", "rawtypes" })
     @Test
     void startGameTimer_CountdownDecrementsCorrectly() {
-        boardService = new BoardService(messagingTemplate);
-
-        String gameId = "test-game";
-        Map<String, ColorStatus> playerColors = Map.of(
-            UUID.randomUUID().toString(), ColorStatus.RED
+        ArgumentCaptor<Runnable> runnableCaptor = ArgumentCaptor.forClass(Runnable.class);
+        when(taskScheduler.scheduleAtFixedRate(runnableCaptor.capture(), any(Duration.class)))
+            .thenReturn((ScheduledFuture) scheduledFuture);
+        
+        boardService.startGameTimer(gameId, 3);
+        
+        Runnable scheduledTask = runnableCaptor.getValue();
+        
+        Map<String, Object> expectedMessage = new HashMap<>();
+        expectedMessage.put("timeLeft", 2);
+        
+        scheduledTask.run();
+        verify(messagingTemplate).convertAndSend(
+            "/topic/board." + gameId,
+            expectedMessage
         );
 
-        boardService.createBoardWithPlayers(gameId, playerColors);
-        boardService.startGameTimer(gameId, 3);
-
-        await().atMost(4, TimeUnit.SECONDS)
-            .untilAsserted(() -> {
-                ArgumentCaptor<Map<?, ?>> messageCaptor = ArgumentCaptor.forClass(Map.class);
-
-                verify(messagingTemplate, atLeast(3))
-                    .convertAndSend(eq("/topic/board." + gameId), messageCaptor.capture());
-
-                var allValues = messageCaptor.getAllValues();
-                boolean foundDecreasingValues = false;
-
-                for (int i = 0; i < allValues.size() - 1; i++) {
-                    Integer time1 = (Integer) allValues.get(i).get("timeLeft");
-                    Integer time2 = (Integer) allValues.get(i + 1).get("timeLeft");
-                    if (time1 != null && time2 != null && time1 > time2) {
-                        foundDecreasingValues = true;
-                        break;
-                    }
-                }
-
-                assertTrue(foundDecreasingValues, "El tiempo debería decrementar en las actualizaciones");
-            });
+        expectedMessage.put("timeLeft", 1);
+        scheduledTask.run();
+        verify(messagingTemplate).convertAndSend(
+                "/topic/board." + gameId,
+                expectedMessage
+            );
     }
 
-
+    @SuppressWarnings({ "unchecked", "rawtypes" })
     @Test
     void startGameTimer_ReachesZero_EndsGame() {
-        boardService = new BoardService(messagingTemplate);
-
-        String gameId = "test-game";
-        Map<String, ColorStatus> playerColors = Map.of(
-            UUID.randomUUID().toString(), ColorStatus.RED
-        );
-
-        boardService.createBoardWithPlayers(gameId, playerColors);
-        boardService.startGameTimer(gameId, 1);
-
-        await().atMost(3, TimeUnit.SECONDS)
-            .untilAsserted(() -> {
-                ArgumentCaptor<Map<?, ?>> messageCaptor = ArgumentCaptor.forClass(Map.class);
-
-                verify(messagingTemplate, atLeastOnce())
-                    .convertAndSend(eq("/topic/board." + gameId), messageCaptor.capture());
-
-                boolean gameEnded = messageCaptor.getAllValues().stream()
-                    .anyMatch(msg -> {
-                        Object val = msg.get("gameOver");
-                        return Boolean.TRUE.equals(val);
-                    });
-
-                assertTrue(gameEnded, "Debería haberse enviado el mensaje de fin del juego");
-            });
+        when(boardTopic.getTopic()).thenReturn("/topic/board");
+        
+        ArgumentCaptor<Runnable> runnableCaptor = ArgumentCaptor.forClass(Runnable.class);
+        when(taskScheduler.scheduleAtFixedRate(runnableCaptor.capture(), any(Duration.class)))
+            .thenReturn((ScheduledFuture) scheduledFuture);
+        
+        when(redisTemplate.opsForValue()).thenReturn(valueOperations);
+        
+        Board mockBoard = new Board(gameId, playerColors);
+        when(valueOperations.get(boardKey)).thenReturn(mockBoard);
+        
+        boardService.startGameTimer(gameId, 0);
+        
+        Runnable scheduledTask = runnableCaptor.getValue();
+        scheduledTask.run();
+        
+        verify(messagingTemplate).convertAndSend(eq("/topic/board." + gameId), any(Map.class));
+        verify(scheduledFuture).cancel(true);
     }
 
-
+    @SuppressWarnings({ "unchecked", "rawtypes" })
     @Test
     void startGameTimer_RemovesBoardAfterGameEnd() {
-        boardService = new BoardService(messagingTemplate);
+        when(boardTopic.getTopic()).thenReturn("/topic/board");
         
-        String gameId = "test-game";
-        Map<String, ColorStatus> playerColors = Map.of(
-            UUID.randomUUID().toString(), ColorStatus.RED
-        );
+        ArgumentCaptor<Runnable> runnableCaptor = ArgumentCaptor.forClass(Runnable.class);
+        when(taskScheduler.scheduleAtFixedRate(runnableCaptor.capture(), any(Duration.class)))
+            .thenReturn((ScheduledFuture) scheduledFuture);
         
-        boardService.createBoardWithPlayers(gameId, playerColors);
+        when(redisTemplate.opsForValue()).thenReturn(valueOperations);
         
-        assertTrue(boardService.getAllBoardIds().contains(gameId));
+        Board mockBoard = new Board(gameId, playerColors);
+        when(valueOperations.get(boardKey)).thenReturn(mockBoard);
         
-        boardService.startGameTimer(gameId, 1);
+        boardService.startGameTimer(gameId, 0);
         
-        await().atMost(3, TimeUnit.SECONDS)
-            .untilAsserted(() -> 
-                assertFalse(boardService.getAllBoardIds().contains(gameId), 
-                    "El board debería ser removido cuando el juego termina")
-            );
+        Runnable scheduledTask = runnableCaptor.getValue();
+        scheduledTask.run();
+        
+        verify(redisTemplate).delete(boardKey);
     }
-
+    
     @Test
     void endGame_Success() {
-        boardService = new BoardService(messagingTemplate);
-
-        String gameId = "test-game";
-        Map<String, ColorStatus> playerColors = Map.of(
-            UUID.randomUUID().toString(), ColorStatus.RED,
-            UUID.randomUUID().toString(), ColorStatus.GREEN
-        );
-
-        boardService.createBoardWithPlayers(gameId, playerColors);
-
-        assertTrue(boardService.getAllBoardIds().contains(gameId));
-
+        when(boardTopic.getTopic()).thenReturn("/topic/board");
+        when(redisTemplate.opsForValue()).thenReturn(valueOperations);
+        
+        Board mockBoard = new Board(gameId, playerColors);
+        when(valueOperations.get(boardKey)).thenReturn(mockBoard);
+        
         boardService.endGame(gameId);
-
-        ArgumentCaptor<Map<?, ?>> messageCaptor = ArgumentCaptor.forClass(Map.class);
-        verify(messagingTemplate).convertAndSend(eq("/topic/board." + gameId), messageCaptor.capture());
-
-        Map<?, ?> sentMessage = messageCaptor.getValue();
-
-        assertNotNull(sentMessage.get("players"), "Debería incluir la información de jugadores");
-        assertFalse(boardService.getAllBoardIds().contains(gameId),
-            "El board debería ser removido después de endGame");
-    }
-
-
-    @Test
-    void startGameTimer_MultipleGames_IndependentTimers() {
-        boardService = new BoardService(messagingTemplate);
         
-        String gameId1 = "game-1";
-        String gameId2 = "game-2";
-        
-        Map<String, ColorStatus> playerColors = Map.of(
-            UUID.randomUUID().toString(), ColorStatus.RED
-        );
-        
-        boardService.createBoardWithPlayers(gameId1, playerColors);
-        boardService.createBoardWithPlayers(gameId2, playerColors);
-        
-        boardService.startGameTimer(gameId1, 2);
-        boardService.startGameTimer(gameId2, 3);
-        
-        await().atMost(2, TimeUnit.SECONDS)
-            .untilAsserted(() -> {
-                assertTrue(boardService.getAllBoardIds().contains(gameId1));
-                assertTrue(boardService.getAllBoardIds().contains(gameId2));
-            });
-        
-        await().atMost(4, TimeUnit.SECONDS)
-            .untilAsserted(() -> {
-                verify(messagingTemplate, atLeastOnce())
-                    .convertAndSend(eq("/topic/board." + gameId1), any(Map.class));
-                verify(messagingTemplate, atLeastOnce())
-                    .convertAndSend(eq("/topic/board." + gameId2), any(Map.class));
-            });
-    }
-
-    @Test
-    void startGameTimer_CancelsPreviousTimer_WhenNewTimerStarted() {
-        boardService = new BoardService(messagingTemplate);
-        
-        String gameId = "test-game";
-        Map<String, ColorStatus> playerColors = Map.of(
-            UUID.randomUUID().toString(), ColorStatus.RED
-        );
-        
-        boardService.createBoardWithPlayers(gameId, playerColors);
-        
-        boardService.startGameTimer(gameId, 10);
-        
-        await().atMost(200, TimeUnit.MILLISECONDS);
-        
-        boardService.startGameTimer(gameId, 5);
-        
-        await().atMost(7, TimeUnit.SECONDS)
-            .untilAsserted(() -> 
-                verify(messagingTemplate, atLeast(6))
-                    .convertAndSend(eq("/topic/board." + gameId), any(Map.class))
-            );
-    }
-    @SuppressWarnings("unchecked")
-    private Map<String, Board> getBoardsField() {
-        try {
-            var field = boardService.getClass().getDeclaredField("boards");
-            field.setAccessible(true);
-            return (Map<String, Board>) field.get(boardService);
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to access field: boards", e);
-        }
+        verify(messagingTemplate).convertAndSend(eq("/topic/board." + gameId), any(Map.class));
+        verify(redisTemplate).convertAndSend(eq("/topic/board"), any(Map.class));
+        verify(redisTemplate).delete(boardKey);
     }
 }

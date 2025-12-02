@@ -12,6 +12,7 @@ import com.colorcraze.board.dtos.responses.PlayerUpdate;
 import com.colorcraze.utils.enums.ColorStatus;
 import com.colorcraze.utils.enums.PlayerMove;
 
+
 /**
  * Represents the game board for Color Craze.
  * 
@@ -30,6 +31,14 @@ public class Board {
     private final List<UUID> lockQueue = new ArrayList<>();
 
     private final String gameId;
+    
+
+    public Board() {
+        this.grid = new Box[ROWS][COLS];
+        this.players = new HashMap<>();
+        this.gameId = null;
+    }
+
 
     /**
      * Creates a new Board instance with the specified game ID and initial player colors.

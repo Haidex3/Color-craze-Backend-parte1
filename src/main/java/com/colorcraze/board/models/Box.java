@@ -19,12 +19,18 @@ import lombok.Setter;
     property = "type"
 )
 @JsonSubTypes({
+    @JsonSubTypes.Type(value = Box.class, name = "Box"),
+    @JsonSubTypes.Type(value = Platform.class, name = "Platform"),
     @JsonSubTypes.Type(value = Player.class, name = "Player"),
-    @JsonSubTypes.Type(value = Platform.class, name = "Platform")
+    @JsonSubTypes.Type(value = TpPlatform.class, name = "TpPlatform")
 })
 @Getter
 @Setter
 @AllArgsConstructor
 public class Box {
     protected ColorStatus color;
+
+    public Box() {
+        this.color = ColorStatus.WHITE;
+    }
 }

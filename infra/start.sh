@@ -1,5 +1,8 @@
 #!/bin/bash
 
+echo "▶ Starting Redis Server..."
+redis-server --daemonize yes
+
 echo "▶ Starting Backend Instance 1 on 8081..."
 java -jar app.jar --server.port=8081 &
 

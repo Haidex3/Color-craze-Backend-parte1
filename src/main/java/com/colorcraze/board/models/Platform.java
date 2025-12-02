@@ -17,4 +17,7 @@ public class Platform extends Box{
         super(color);
     }
     
+    public Platform() {
+        super(ColorStatus.WHITE);
+    }
 }
