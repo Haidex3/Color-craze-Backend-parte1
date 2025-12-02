@@ -13,6 +13,7 @@ import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
 
 import com.colorcraze.board.models.Board;
 import com.colorcraze.utils.enums.ColorStatus;
+import com.colorcraze.utils.enums.PlayerMove;
 
 import java.util.*;
 import java.util.concurrent.ScheduledFuture;
@@ -21,6 +22,9 @@ import java.time.Duration;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
+
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 
 @ExtendWith(MockitoExtension.class)
 class BoardServiceTest {
@@ -44,6 +48,8 @@ class BoardServiceTest {
     private ThreadPoolTaskScheduler taskScheduler;
 
     private BoardService boardService;
+
+    private Method validateMethod;
     
     private final String serverId = "test-server-1";
     private final String gameId = "test-game-123";
@@ -75,9 +81,50 @@ class BoardServiceTest {
             @SuppressWarnings("unchecked")
             Map<String, ScheduledFuture<?>> timers = (Map<String, ScheduledFuture<?>>) timersField.get(boardService);
             timers.clear();
+            var validateMethodField = BoardService.class.getDeclaredMethod(
+                        "validateParameters", String.class, String.class, PlayerMove.class
+                );
+                validateMethodField.setAccessible(true);
+                validateMethod = validateMethodField;
+
         } catch (Exception e) {
             throw new RuntimeException("Error setting up test", e);
         }
+    }
+
+    @Test
+    void validateParameters_ShouldNotThrow_WhenInputsAreValid() {
+        assertDoesNotThrow(() ->
+                validateMethod.invoke(boardService, gameId, playerId1, PlayerMove.UP)
+        );
+    }
+
+    @Test
+    void validateParameters_ShouldThrow_WhenGameIdInvalid() {
+        assertThrows(InvocationTargetException.class, () ->
+                validateMethod.invoke(boardService, "invalid game id", playerId1, PlayerMove.UP)
+        );
+    }
+
+    @Test
+    void validateParameters_ShouldThrow_WhenPlayerIdIsBlank() {
+        assertThrows(InvocationTargetException.class, () ->
+                validateMethod.invoke(boardService, gameId, " ", PlayerMove.UP)
+        );
+    }
+
+    @Test
+    void validateParameters_ShouldThrow_WhenPlayerIdIsNull() {
+        assertThrows(InvocationTargetException.class, () ->
+                validateMethod.invoke(boardService, gameId, null, PlayerMove.UP)
+        );
+    }
+
+    @Test
+    void validateParameters_ShouldThrow_WhenMoveIsNull() {
+        assertThrows(InvocationTargetException.class, () ->
+                validateMethod.invoke(boardService, gameId, playerId1, null)
+        );
     }
 
     @Test
@@ -162,6 +209,7 @@ class BoardServiceTest {
         verify(valueOperations).get(boardKey);
     }
 
+    
     @Test
     void getBlock_Success() {
         when(redisTemplate.opsForValue()).thenReturn(valueOperations);
