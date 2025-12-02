@@ -25,19 +25,19 @@ public class RateLimitInterceptor implements HandlerInterceptor {
             throws Exception {
 
         if (!(handler instanceof HandlerMethod method)) {
-            return true; // no es endpoint REST
+            return true;
         }
 
         RateLimit annotation = method.getMethodAnnotation(RateLimit.class);
         if (annotation == null) {
-            return true; // sin anotación
+            return true;
         }
 
         Integer limit = annotation.limit();
 
         String uid = (String) request.getAttribute("firebaseUid");
         if (uid == null) {
-            return true; // no autenticado → no rate limit
+            return true;
         }
 
         String endpoint = request.getMethod() + ":" + request.getRequestURI();

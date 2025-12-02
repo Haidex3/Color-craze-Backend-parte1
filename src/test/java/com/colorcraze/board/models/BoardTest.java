@@ -152,6 +152,20 @@ class BoardTest {
     }
 
     @Test
+    void testEmptyConstructor() {
+        Board board2 = new Board();
+
+        assertNotNull(board2.getGrid(), "El grid no debe ser null");
+        assertEquals(15, board2.getGrid().length, "El número de filas debe ser 15");
+        assertEquals(31, board2.getGrid()[0].length, "El número de columnas debe ser 31");
+
+        assertNotNull(board2.getPlayers(), "El mapa de jugadores no debe ser null");
+        assertTrue(board2.getPlayers().isEmpty(), "El mapa de jugadores debe iniciar vacío");
+
+        assertNull(board2.getGameId(), "El gameId debe iniciar en null");
+    }
+
+    @Test
     @DisplayName("Should handle player up state correctly")
     void testPlayerUpState() {
         board.setPlayerIsUp(player1Id, true);

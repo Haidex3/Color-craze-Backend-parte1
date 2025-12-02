@@ -18,6 +18,9 @@ import com.colorcraze.board.dtos.responses.PlayerUpdate;
 import com.colorcraze.board.services.BoardService;
 import com.colorcraze.utils.enums.PlayerMove;
 
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
 import lombok.RequiredArgsConstructor;
 
 /**
@@ -39,7 +42,9 @@ public class GameSocketController {
      * @param moveMessage the message containing player ID and move direction
      */
     @MessageMapping("/move.{gameId}")
-    public void handlePlayerMove(@DestinationVariable String gameId, @Payload PlayerMoveMessage moveMessage) {
+    public void handlePlayerMove(
+        @DestinationVariable @NotBlank @Pattern(regexp = "^[a-zA-Z0-9-]+$") String gameId,
+        @Valid @Payload PlayerMoveMessage moveMessage) {
         List<MoveResult> results = boardService.movePlayer(gameId, moveMessage.getPlayerId(), moveMessage.getDirection());
 
         CompletableFuture.runAsync(() -> {

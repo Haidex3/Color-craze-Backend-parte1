@@ -20,6 +20,8 @@ import com.colorcraze.board.models.Player;
 import com.colorcraze.utils.enums.ColorStatus;
 import com.colorcraze.utils.enums.PlayerMove;
 
+import java.util.regex.Pattern;
+
 /**
  * Service responsible for managing game boards and handling player moves.
  * Provides methods to create boards, retrieve boards, manipulate blocks, 
@@ -33,6 +35,7 @@ public class BoardService {
     private static final String ORIGIN_FIELD = "origin";
     private static final String TYPE_FIELD = "type";
     private static final String PAYLOAD_FIELD = "payload";
+    private static final Pattern SAFE_ID_PATTERN = Pattern.compile("^[a-zA-Z0-9-]+$");
 
     private final RedisTemplate<String, Object> redisTemplate;
     private final SimpMessagingTemplate messagingTemplate;
@@ -92,13 +95,27 @@ public class BoardService {
         return redisTemplate.keys(BOARD_KEY_PREFIX + "*");
     }
 
+    private void validateParameters(String gameId, String playerId, PlayerMove playerMove) {
+        if (!SAFE_ID_PATTERN.matcher(gameId).matches()) {
+            throw new IllegalArgumentException("Invalid gameId");
+        }
+        if (playerId == null || playerId.isBlank()) {
+            throw new IllegalArgumentException("Invalid playerId");
+        }
+        if (playerMove == null) {
+            throw new IllegalArgumentException("Player move cannot be null");
+        }
+    }
+
     public List<MoveResult> movePlayer(String gameId, String playerId, PlayerMove playerMove) {
+        validateParameters(gameId, playerId, playerMove);
         Board board = getBoard(gameId);
         List<MoveResult> results = boardServiceLocalMove(board, playerId, playerMove);
 
         redisTemplate.opsForValue().set(BOARD_KEY_PREFIX + gameId, board);
 
         for (MoveResult r : results) {
+
             Map<String, Object> msg = Map.of(
                     TYPE_FIELD, "move",
                     GAME_ID_FIELD, gameId,
@@ -107,9 +124,9 @@ public class BoardService {
             );
             redisTemplate.convertAndSend(boardTopic.getTopic(), msg);
         }
-
-        return results;
+        return List.copyOf(results);
     }
+
 
     private List<MoveResult> boardServiceLocalMove(Board board, String playerId, PlayerMove playerMove) {
         UUID uuid = UUID.fromString(playerId);
