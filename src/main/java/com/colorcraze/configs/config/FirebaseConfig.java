@@ -1,4 +1,4 @@
-package com.colorcraze.configs;
+package com.colorcraze.configs.config;
 
 import com.colorcraze.configs.exceptions.FirebaseInitializationException;
 import com.google.auth.oauth2.GoogleCredentials;

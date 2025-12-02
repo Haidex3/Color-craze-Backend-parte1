@@ -1,4 +1,4 @@
-package com.colorcraze.configs;
+package com.colorcraze.configs.config;
 
 import org.springframework.context.annotation.Configuration;
 import org.springframework.messaging.simp.config.MessageBrokerRegistry;

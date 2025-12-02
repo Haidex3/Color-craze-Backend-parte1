@@ -29,7 +29,7 @@
             **/dtos/**,
             **/enums/**,
             **/specifications/**,
-            **/configs/**,
+            **/config/**,
             **/security/**,
 			**/utils/**,
 			**/exceptions/**,
