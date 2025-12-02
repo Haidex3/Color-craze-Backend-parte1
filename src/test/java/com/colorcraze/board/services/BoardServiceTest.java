@@ -16,12 +16,7 @@ import com.colorcraze.utils.enums.ColorStatus;
 
 import java.util.*;
 import java.util.concurrent.ScheduledFuture;
-import java.util.concurrent.TimeUnit;
 import java.time.Duration;
-import static org.awaitility.Awaitility.await;
-import java.util.concurrent.TimeUnit;
-
-
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -187,7 +182,6 @@ class BoardServiceTest {
         Board mockBoard = new Board(gameId, playerColors);
         when(valueOperations.get(boardKey)).thenReturn(mockBoard);
         
-        var originalBlock = mockBoard.getGrid()[0][0];
         var newBlock = new com.colorcraze.board.models.Box(ColorStatus.RED);
         
         boardService.setBlock(gameId, 0, 0, newBlock);
@@ -208,7 +202,7 @@ class BoardServiceTest {
         
         when(mockBoard.isPlayerUp(uuid1)).thenReturn(false);
         when(mockBoard.getRowDownPLayer(playerId1)).thenReturn(mock(com.colorcraze.board.models.Platform.class));
-        when(mockBoard.movePlayer(eq(uuid1), eq(com.colorcraze.utils.enums.PlayerMove.UP)))
+        when(mockBoard.movePlayer(uuid1, com.colorcraze.utils.enums.PlayerMove.UP))
             .thenReturn(new com.colorcraze.board.dtos.responses.MoveResult(
                 uuid1, 1, 1, List.of(), List.of(), true, false
             ));
@@ -276,9 +270,9 @@ class BoardServiceTest {
         when(mockBoard.isPlayerUp(uuid1)).thenReturn(false);
         when(mockBoard.getRowDownPLayer(playerId1)).thenReturn(mock(com.colorcraze.board.models.Platform.class));
         
-        when(mockBoard.movePlayer(eq(uuid1), eq(com.colorcraze.utils.enums.PlayerMove.UP)))
+        when(mockBoard.movePlayer(uuid1, com.colorcraze.utils.enums.PlayerMove.UP))
             .thenReturn(null);
-        
+
         var results = boardService.movePlayer(gameId, playerId1, com.colorcraze.utils.enums.PlayerMove.UP);
         
         assertNotNull(results);
@@ -309,18 +303,22 @@ class BoardServiceTest {
             uuid1, 2, 1, List.of(), List.of(), true, false
         );
         
-        when(mockBoard.movePlayer(eq(uuid1), eq(com.colorcraze.utils.enums.PlayerMove.UP)))
+        when(mockBoard.movePlayer(uuid1, com.colorcraze.utils.enums.PlayerMove.UP))
             .thenReturn(step1)
             .thenReturn(step2)
             .thenReturn(null);
-        
+
         var results = boardService.movePlayer(gameId, playerId1, com.colorcraze.utils.enums.PlayerMove.UP);
         
         assertNotNull(results);
         assertEquals(1, results.size());
         assertEquals(2, results.get(0).newRow());
         
-        verify(mockBoard, times(3)).movePlayer(eq(uuid1), eq(com.colorcraze.utils.enums.PlayerMove.UP));
+        verify(mockBoard, times(3)).movePlayer(
+            uuid1,
+            com.colorcraze.utils.enums.PlayerMove.UP
+        );
+
         verify(mockBoard).setPlayerIsUp(uuid1, true);
         verify(mockBoard).setPlayerIsUp(uuid1, false);
         verify(redisTemplate, times(2)).opsForValue();
@@ -341,8 +339,9 @@ class BoardServiceTest {
             uuid1, 1, 2, List.of(), List.of(), true, false
         );
         
-        when(mockBoard.movePlayer(eq(uuid1), eq(com.colorcraze.utils.enums.PlayerMove.RIGHT)))
-            .thenReturn(moveResult);
+        when(mockBoard.movePlayer(uuid1, com.colorcraze.utils.enums.PlayerMove.RIGHT))
+            .thenReturn(moveResult);    
+
         
         var results = boardService.movePlayer(gameId, playerId1, com.colorcraze.utils.enums.PlayerMove.RIGHT);
         
@@ -371,7 +370,7 @@ class BoardServiceTest {
             uuid1, 2, 1, List.of(), List.of(), true, false
         );
         
-        when(mockBoard.movePlayer(eq(uuid1), eq(com.colorcraze.utils.enums.PlayerMove.DOWN)))
+        when(mockBoard.movePlayer(uuid1, com.colorcraze.utils.enums.PlayerMove.DOWN))
             .thenReturn(moveResult);
         
         var results = boardService.movePlayer(gameId, playerId1, com.colorcraze.utils.enums.PlayerMove.DOWN);
@@ -407,9 +406,10 @@ class BoardServiceTest {
             true, true
         );
         
-        when(mockBoard.movePlayer(eq(uuid1), eq(com.colorcraze.utils.enums.PlayerMove.UP)))
-            .thenReturn(stepResult)
-            .thenReturn(null);
+        when(mockBoard.movePlayer(uuid1, com.colorcraze.utils.enums.PlayerMove.UP))
+        .thenReturn(stepResult)
+        .thenReturn(null);
+
         
         var results = boardService.movePlayer(gameId, playerId1, com.colorcraze.utils.enums.PlayerMove.UP);
         
@@ -419,7 +419,10 @@ class BoardServiceTest {
         assertEquals(1, results.get(0).platforms().size());
         assertEquals(1, results.get(0).affectedPlayers().size());
         
-        verify(mockBoard, times(2)).movePlayer(eq(uuid1), eq(com.colorcraze.utils.enums.PlayerMove.UP));
+        verify(mockBoard, times(2)).movePlayer(
+                uuid1,
+                com.colorcraze.utils.enums.PlayerMove.UP
+            );
         verify(mockBoard).setPlayerIsUp(uuid1, true);
         verify(mockBoard).setPlayerIsUp(uuid1, false);
         verify(redisTemplate, times(2)).opsForValue();
@@ -543,11 +546,17 @@ class BoardServiceTest {
         expectedMessage.put("timeLeft", 2);
         
         scheduledTask.run();
-        verify(messagingTemplate).convertAndSend(eq("/topic/board." + gameId), eq(expectedMessage));
-        
+        verify(messagingTemplate).convertAndSend(
+            "/topic/board." + gameId,
+            expectedMessage
+        );
+
         expectedMessage.put("timeLeft", 1);
         scheduledTask.run();
-        verify(messagingTemplate).convertAndSend(eq("/topic/board." + gameId), eq(expectedMessage));
+        verify(messagingTemplate).convertAndSend(
+                "/topic/board." + gameId,
+                expectedMessage
+            );
     }
 
     @SuppressWarnings({ "unchecked", "rawtypes" })
