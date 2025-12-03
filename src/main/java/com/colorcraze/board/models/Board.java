@@ -115,7 +115,7 @@ public class Board {
             platforms.add(new Position(i, cols - 1));
         }
 
-        platforms.add(new Position(6, 2));
+        platforms.add(new Position(8, 2));
         platforms.add(new Position(7, 28));
 
         return platforms;
