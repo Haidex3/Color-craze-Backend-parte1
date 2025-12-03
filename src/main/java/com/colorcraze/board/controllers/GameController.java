@@ -8,6 +8,7 @@ import org.springframework.web.bind.annotation.*;
 
 import com.colorcraze.board.models.Board;
 import com.colorcraze.board.services.BoardService;
+import com.colorcraze.configs.ratelimit.RateLimit;
 import com.colorcraze.waitingroom.dtos.responses.WaitingRoomState;
 import com.colorcraze.waitingroom.services.WaitingRoomService;
 
@@ -39,6 +40,7 @@ public class GameController {
      * or a bad request response if the room does not exist or is empty
      */
     @PostMapping("/create-from-room/{roomId}")
+    @RateLimit(limit = 3)
     public ResponseEntity<Map<String, Object>> createGameFromRoom(@PathVariable String roomId) {
         WaitingRoomState roomState = waitingRoomService.getRoomState(roomId);
 
@@ -69,6 +71,7 @@ public class GameController {
      * @return a response containing the board state, or a 404 error if the game is not found
      */
     @GetMapping("/{gameId}")
+    @RateLimit(limit = 3)
     public ResponseEntity<Object> getBoardState(@PathVariable String gameId) {
         Board board = boardService.getBoard(gameId);
 

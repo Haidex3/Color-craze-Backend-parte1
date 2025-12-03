@@ -35,6 +35,7 @@ public class WaitingRoomRestController {
      * @return ResponseEntity containing the current state of the waiting room.
      */
     @PostMapping("/create/{playerId}")
+    @RateLimit(limit = 3)
     public ResponseEntity<WaitingRoomState> createRoom(@PathVariable String playerId) {
         if (playerId == null || playerId.trim().isEmpty()) {
             return ResponseEntity.badRequest().build();

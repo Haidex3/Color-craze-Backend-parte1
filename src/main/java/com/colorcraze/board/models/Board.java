@@ -105,17 +105,18 @@ public class Board {
             platforms.add(new Position(0, i));
             platforms.add(new Position(rows - 1, i));
 
-            if (i >= 8 && i <= 22) platforms.add(new Position(3, i));
+            if (i >= 8 && i <= 25) platforms.add(new Position(3, i));
             if (i >= 6 && i < 24) platforms.add(new Position(7, i));
             if (i >= 4 && i <= 25) platforms.add(new Position(11, i));
         }
 
         for (int i = 0; i < rows; i++) {
-            if (i != 9) {
-                platforms.add(new Position(i, 0));
-                platforms.add(new Position(i, cols - 1));
-            }
+            platforms.add(new Position(i, 0));
+            platforms.add(new Position(i, cols - 1));
         }
+
+        platforms.add(new Position(6, 2));
+        platforms.add(new Position(7, 28));
 
         return platforms;
     }

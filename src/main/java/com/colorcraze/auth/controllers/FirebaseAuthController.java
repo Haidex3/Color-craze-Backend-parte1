@@ -8,6 +8,7 @@ import org.springframework.web.bind.annotation.*;
 import com.colorcraze.auth.dtos.FirebaseLoginRequest;
 import com.colorcraze.auth.dtos.LoginResponse;
 import com.colorcraze.auth.services.FirebaseAuthService;
+import com.colorcraze.configs.ratelimit.RateLimit;
 
 /**
  * REST controller that exposes authentication endpoints backed by Firebase.
@@ -39,6 +40,7 @@ public class FirebaseAuthController {
      * @return a 200 OK response with login details if authentication succeeds
      */
     @PostMapping("/firebase-login")
+    @RateLimit(limit = 3)
     public ResponseEntity<LoginResponse> firebaseLogin(@RequestBody FirebaseLoginRequest request) {
         LoginResponse resp = authService.loginWithFirebase(request);
         return ResponseEntity.ok(resp);
@@ -53,6 +55,7 @@ public class FirebaseAuthController {
      * @return a 200 OK response with login details if authentication succeeds
      */
     @PostMapping("/firebase-guest")
+    @RateLimit(limit = 3)
     public ResponseEntity<LoginResponse> firebaseGuest(@RequestBody FirebaseLoginRequest request) {
         return firebaseLogin(request);
     }
@@ -67,6 +70,7 @@ public class FirebaseAuthController {
      * @return a 200 OK response with new JWT tokens, or 400 Bad Request if the token is missing
      */
     @PostMapping("/refresh")
+    @RateLimit(limit = 3)
     public ResponseEntity<LoginResponse> refresh(@RequestBody Map<String, String> body) {
         String refreshToken = body.get("refreshToken");
         if (refreshToken == null) {
