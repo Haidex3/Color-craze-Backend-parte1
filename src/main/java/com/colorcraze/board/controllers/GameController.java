@@ -2,6 +2,7 @@ package com.colorcraze.board.controllers;
 
 import lombok.RequiredArgsConstructor;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -26,7 +27,8 @@ public class GameController {
     private static final String ERROR_KEY = "error";
     private static final String ROOM_NOT_FOUND_OR_EMPTY = "Sala no existe o está vacía";
     private static final String GAME_CREATION_ERROR = "Error al crear el juego";
-    private static final String GAME_NOT_FOUND = "Juego no encontrado";
+    @Value("${server.port}")
+    private String port;
 
     private final BoardService boardService;
     private final WaitingRoomService waitingRoomService;
@@ -71,15 +73,14 @@ public class GameController {
      * @return a response containing the board state, or a 404 error if the game is not found
      */
     @GetMapping("/{gameId}")
-    @RateLimit(limit = 3)
+    @RateLimit(limit = 10)
     public ResponseEntity<Object> getBoardState(@PathVariable String gameId) {
-        Board board = boardService.getBoard(gameId);
-
-        if (board == null) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                    .body(Map.of(ERROR_KEY, GAME_NOT_FOUND));
-        }
-
-        return ResponseEntity.ok(board);
-    }
+        System.out.println("Fetching board state for gameId: " + gameId + " on port: " + port);
+            try {
+                Board board = boardService.getBoard(gameId);
+                return ResponseEntity.ok(board);
+            } catch (IllegalStateException e) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(Map.of("error board not found", e.getMessage()));
+            }}
 }

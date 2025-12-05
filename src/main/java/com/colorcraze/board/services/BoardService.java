@@ -67,10 +67,16 @@ public class BoardService {
     }
 
     public Board getBoard(String gameId) {
-        String key = BOARD_KEY_PREFIX + gameId;
-        Board board = (Board) redisTemplate.opsForValue().get(key);
-        if (board == null) throw new IllegalStateException("No board exists with id " + gameId);
-        return board;
+        try {
+            String key = BOARD_KEY_PREFIX + gameId;
+            Board board = (Board) redisTemplate.opsForValue().get(key);
+            if (board == null) {
+                throw new IllegalStateException("No board exists with id " + gameId);
+            }
+            return board;
+        } catch (IllegalStateException e) {
+            throw new IllegalStateException(e.getMessage());
+        }
     }
 
     public Box getBlock(String gameId, int row, int col) {
@@ -202,17 +208,20 @@ public class BoardService {
 
     public void endGame(String gameId) {
         Board board = getBoard(gameId);
-
+        List<Player> players = new ArrayList<>(board.getPlayers().values());
         messagingTemplate.convertAndSend("/topic/board." + gameId, Map.of(
                 "gameOver", true,
-                "players", board.getPlayers().values()
+                "players", players
         ));
 
         Map<String, Object> msg = Map.of(
             TYPE_FIELD, "end",
             GAME_ID_FIELD, gameId,
             ORIGIN_FIELD, serverId,
-            PAYLOAD_FIELD, Map.of("gameOver", true, "players", board.getPlayers().values())
+            PAYLOAD_FIELD, Map.of(
+                        "gameOver", true,
+                        "players", players
+                )
         );
         redisTemplate.convertAndSend(boardTopic.getTopic(), msg);
 
