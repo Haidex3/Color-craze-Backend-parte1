@@ -2,6 +2,7 @@ package com.colorcraze.board.controllers;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 
@@ -33,6 +34,7 @@ public class GameSocketController {
 
     private final BoardService boardService;
     private final SimpMessagingTemplate messagingTemplate;
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(GameSocketController.class);
 
     /**
      * Handles a player move received via WebSocket.
@@ -45,26 +47,41 @@ public class GameSocketController {
     public void handlePlayerMove(
         @DestinationVariable @NotBlank @Pattern(regexp = "^[a-zA-Z0-9-]+$") String gameId,
         @Valid @Payload PlayerMoveMessage moveMessage) {
-        List<MoveResult> results = boardService.movePlayer(gameId, moveMessage.getPlayerId(), moveMessage.getDirection());
+        try {
+            List<MoveResult> results =
+                    boardService.movePlayer(gameId, moveMessage.getPlayerId(), moveMessage.getDirection());
 
-        CompletableFuture.runAsync(() -> {
-            if (results == null || results.isEmpty()) return;
+            CompletableFuture.runAsync(() -> {
+                if (results == null || results.isEmpty()) return;
 
-            for (MoveResult result : results) {
-                try {
-                    Thread.sleep(110);
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                    break;
+                for (MoveResult result : results) {
+                    try {
+                        Thread.sleep(110);
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                        break;
+                    }
+
+                    messagingTemplate.convertAndSend("/topic/board." + gameId, result);
+
+                    if (result.gravity()) {
+                        applyGravity(gameId, moveMessage.getPlayerId());
+                    }
                 }
-                messagingTemplate.convertAndSend("/topic/board." + gameId, result);
+            });
 
-                if (result.gravity()) {
-                    applyGravity(gameId, moveMessage.getPlayerId());
-                }
-            }
-        });
+        } catch (IllegalStateException e) {
+            log.warn("Move ignored: {}", e.getMessage());
+
+            messagingTemplate.convertAndSend(
+                "/topic/errors." + gameId,
+                Map.of("error", e.getMessage())
+            );
+        } catch (Exception e) {
+            log.error("Unexpected error in WebSocket move handler: {}", e.getMessage());
+        }
     }
+
 
     /**
      * Applies gravity logic for a player, updating the board state and sending final results.
